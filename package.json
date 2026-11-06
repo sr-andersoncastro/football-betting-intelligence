@@ -1,2 +1,2 @@
-{"name":"football-betting-intelligence","version":"0.6.0","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test","sync":"node scripts/sync.mjs","predict":"node scripts/predict.mjs","benchmark":"node --expose-gc scripts/benchmark.mjs"},"engines":{"node":">=24 <25"}}
+{"name":"football-betting-intelligence","version":"0.7.0","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test","sync":"node scripts/sync.mjs","predict":"node scripts/predict.mjs","benchmark":"node --expose-gc scripts/benchmark.mjs"},"engines":{"node":">=24 <25"}}
 

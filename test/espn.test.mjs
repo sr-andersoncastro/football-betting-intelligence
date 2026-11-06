@@ -62,3 +62,17 @@ test('migração adiciona escopo em banco da versão anterior sem perder dados',
   const db=new Store(path);try{assert.equal(db.fixtures()[0].id,'old');assert.equal(db.coverage()[0].scope,'openliga:bl1:2026');db.ingest(capture());assert.equal(db.fixtures().length,2);}finally{db.close();}
  }finally{await rm(directory,{recursive:true,force:true});}
 });
+test('escanteios mantêm zero real e não transformam ausência ou parcial em zero',()=>{
+ const e=structuredClone(event);e.competitions[0].competitors[0].statistics=[{name:'wonCorners',displayValue:'0'}];e.competitions[0].competitors[1].statistics=[{name:'wonCorners',displayValue:'5'}];
+ const read=()=>normalize(response('bra.1',e),'bra.1',2026,'2026-11-06T10:00:00Z')[0];
+ assert.equal(read().homeCorners,5);assert.equal(read().awayCorners,0);assert.equal(read().corners,5);
+ e.competitions[0].competitors[0].statistics=[];assert.equal(read().awayCorners,null);assert.equal(read().corners,null);
+ e.competitions[0].status.type={name:'STATUS_IN_PROGRESS',state:'in',completed:false};assert.equal(read().homeCorners,null);
+});
+test('nova versão reprocessa evidência ESPN recente sem substituí-la pela semente antiga',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'football-renormalize-'));const path=join(dir,'db.sqlite');
+ try{const db=new Store(path);const e=structuredClone(event);for(const t of e.competitions[0].competitors)t.statistics=[{name:'wonCorners',displayValue:'4'}];db.ingest(capture('bra.1','2026-11-07T10:00:00Z',e));
+  const stale=JSON.parse(db.db.prepare('SELECT json FROM fixtures').get().json);delete stale.homeCorners;delete stale.awayCorners;stale.corners=null;db.db.prepare('UPDATE fixtures SET json=?').run(JSON.stringify(stale));db.db.exec('PRAGMA user_version=0');db.close();
+  const migrated=new Store(path);try{assert.equal(migrated.fixtures()[0].corners,8);assert.equal(migrated.captures().length,1);}finally{migrated.close();}
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

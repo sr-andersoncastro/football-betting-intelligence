@@ -1,4 +1,4 @@
-# Football Betting Intelligence — versão 0.6.0
+# Football Betting Intelligence — versão 0.7.0
 
 Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui modelos experimentais separados para Brasileirão Série A, Premier League, La Liga e Bundesliga.
 
@@ -28,7 +28,7 @@ A ESPN é acessada pelo endpoint público `https://site.api.espn.com/apis/site/v
 
 O sincronizador consulta o ano civil atual e anterior na ESPN; cada evento preserva sua temporada própria. Uma temporada europeia cruza dois anos. Assim, a temporada mais antiga pode estar incompleta, e datas futuras ainda não publicadas não aparecem. Respostas com 1.000 eventos são rejeitadas como possivelmente truncadas. Bundesliga consulta a temporada atual e anterior. O painel exibe origem, data de coleta e anos consultados; não anuncia resultados como disponíveis antes da coleta bem-sucedida.
 
-Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios, cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
+Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios são integrados quando a ESPN fornece contagens por equipe. A Bundesliga pela OpenLigaDB não fornece essa estatística. Cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
 
 ## Site e instalação no celular
 
@@ -106,3 +106,9 @@ Medição local em 06/11/2026 com Node 24.22.1 e 6.903 partidas: mediana de 6,03
 Cada partida com histórico suficiente inclui modelos binários leves para mais de 1,5, 2,5 e 3,5 gols e ambas as equipes marcarem. O treino é separado por liga e usa gols recentes das equipes e dos adversários, com ponderação e suavização. Os mesmos cortes temporais de dia UTC e margem de 6 horas impedem usar resultados do próprio dia. São exigidos 160 jogos observados e 8 por equipe. Os limites de totais respeitam probabilidades monotônicas.
 
 Os modelos têm avaliação histórica contra frequências anteriores e avaliação prospectiva separada por mercado, sem duplicar jogos ou usar registros posteriores ao início. Brier binário varia de 0 a 1, diferente do Brier multiclasse do resultado. Registros com mercados adicionais são preservados no arquivo de previsões, sem alterar registros antigos. Modelos experimentais, sem comprovação de ganho futuro.
+
+## Escanteios: segunda etapa
+
+O parser ESPN preserva `homeCorners`, `awayCorners` e o total apenas quando ambos os valores são informados para um jogo encerrado. Ausências, parciais, valores inválidos e campos duplicados não viram zero. Um zero explícito é preservado. A migração reprocessa a evidência original mais recente de cada período ESPN, sem substituir dados recentes por sementes antigas.
+
+Os modelos binários de escanteios estimam totais acima de 8,5, 9,5 e 10,5, separados por liga, com o mesmo corte temporal e limites mínimos de histórico usados nos gols. Usam escanteios recentes conquistados e cedidos por equipe e por mando. A Bundesliga permanece indisponível para esse mercado. A avaliação histórica e prospectiva é independente por limite e mercado.

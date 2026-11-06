@@ -33,3 +33,10 @@ test('recusa probabilidades adicionais inválidas',()=>{
  const g=buildMarkets(rows(),now,'bra.1',[next]).predictions.get('next');g[0].markets[0].probability=2;
  assert.throws(()=>validateExtraMarkets(g),/inválida/);
 });
+test('escanteios só geram probabilidades com valores observados para as duas equipes',()=>{
+ const counted=rows().map((r,i)=>({...r,homeCorners:3+i%4,awayCorners:2+i%3}));
+ const g=buildMarkets(counted,now,'bra.1',[next]).predictions.get('next').find(g=>g.code==='corners');
+ assert.equal(g.status,'experimental');assert.equal(g.markets.length,3);validateExtraMarkets([g]);
+ assert.ok(g.markets[0].probability>=g.markets[1].probability&&g.markets[1].probability>=g.markets[2].probability);
+ const absent=buildMarkets(rows(),now,'bra.1',[next]).predictions.get('next').find(g=>g.code==='corners');assert.equal(absent.status,'unavailable');assert.equal(absent.trainingMatches,0);
+});

@@ -13,6 +13,12 @@ export const leagues = [
   {code:'uefa.champions',name:'Champions League',cup:true},
   {code:'conmebol.libertadores',name:'Copa Libertadores',calendar:true,cup:true}
 ];
+function statistic(team,name,finished){
+  if(!finished||!Array.isArray(team.statistics))return null;
+  const values=team.statistics.filter(s=>s.name===name);
+  if(values.length!==1||!/^\d+$/.test(String(values[0].displayValue??'')))return null;
+  const n=Number(values[0].displayValue);return Number.isSafeInteger(n)?n:null;
+}
 const finals=new Set(['STATUS_FULL_TIME','STATUS_FINAL_AET','STATUS_FINAL_PEN']);
 export function normalize(raw, code, calendarYear, collectedAt) {
   const league=leagues.find(l=>l.code===code);
@@ -43,6 +49,7 @@ export function normalize(raw, code, calendarYear, collectedAt) {
       return Number(team.score);
     };
     const season=event.season.year;
+    const homeCorners=statistic(home,'wonCorners',status==='finished'),awayCorners=statistic(away,'wonCorners',status==='finished');
     return {
       id:`espn:${code}:${event.id}`,providerId:event.id,competition:league.name,competitionCode:code,
       season,seasonLabel:league.calendar?String(season):`${season}/${season+1}`,calendarYear,
@@ -50,7 +57,7 @@ export function normalize(raw, code, calendarYear, collectedAt) {
       homeTeamId:`espn:${home.team.id}`,awayTeamId:`espn:${away.team.id}`,
       kickoff:new Date(event.date).toISOString(),kickoffConfirmed:match.timeValid!==false,
       status,homeGoals:score(home),awayGoals:score(away),
-      corners:null,cards:null,source:'ESPN',collectedAt,tableEligible:!league.cup,
+      homeCorners,awayCorners,corners:homeCorners===null||awayCorners===null?null:homeCorners+awayCorners,cards:null,source:'ESPN',collectedAt,tableEligible:!league.cup,
       resultType:state.name,venue:match.venue?.fullName??null
     };
   }));

@@ -77,7 +77,7 @@ export const server = http.createServer(async (req,res)=>{
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');
   const json = value => {res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value));};
-  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.6.0'});
+  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.7.0'});
   if(url.pathname === '/api/v1/predictions'){
     if(demo)return json({status:'unavailable',reason:'Modelos exclusivos para dados reais das ligas do piloto.',forecasts:[]});
     const code=url.searchParams.get('competition')||'bra.1';
@@ -90,7 +90,7 @@ export const server = http.createServer(async (req,res)=>{
   if(url.pathname === '/api/v1/standings') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',groups:standings(getFixtures()),rules:'3 pontos por vitória; desempate por saldo, gols marcados e nome. Sem ajustes disciplinares ou critérios oficiais adicionais.'});
   if(url.pathname === '/api/v1/data-status') {
     const captures=store.captures(),latest=captures[0]?.collectedAt??null,coverage=coverageStatus();
-    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB + ESPN',latestCollectedAt:latest,stale:coverage.some(c=>c.stale),coverage,captures,logs:store.logs(),unavailable:['corners','cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
+    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB + ESPN',latestCollectedAt:latest,stale:coverage.some(c=>c.stale),coverage,captures,logs:store.logs(),unavailable:['cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
   }
   if(url.pathname === '/api/v1/evaluation') return json({...evaluate(getFixtures()),source:demo?'synthetic':'OpenLigaDB + ESPN',brierConvention:'multiclass sum, range 0–2'});
   const asset = assets.get(url.pathname);
