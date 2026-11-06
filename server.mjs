@@ -76,7 +76,7 @@ export const server = http.createServer(async (req,res)=>{
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');
   const json = value => {res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value));};
-  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.5.0'});
+  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.5.1'});
   if(url.pathname === '/api/v1/predictions'){
     if(demo)return json({status:'unavailable',reason:'Modelos exclusivos para dados reais das ligas do piloto.',forecasts:[]});
     const code=url.searchParams.get('competition')||'bra.1';

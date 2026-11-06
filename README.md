@@ -1,4 +1,4 @@
-# Football Betting Intelligence — versão 0.5
+# Football Betting Intelligence — versão 0.5.1
 
 Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui modelos experimentais separados para Brasileirão Série A, Premier League, La Liga e Bundesliga.
 
@@ -44,7 +44,7 @@ Há também o projeto de APK Android WebView, apontando para `https://football-b
 
 `GET /api/v1/predictions` retorna probabilidades experimentais de vitória da casa, empate e vitória visitante para partidas agendadas nos próximos 7 dias, com horário confirmado e coleta de até 24 horas. O piloto cobre somente Brasileirão Série A (`bra.1`), Premier League (`eng.1`), La Liga (`esp.1`) e Bundesliga (`bl1`). Cada liga tem pesos, histórico, versão e avaliação próprios; resultados de uma não entram no treino de outra. As demais competições continuam disponíveis para consulta, sem previsões.
 
-O endpoint usa `?competition=eng.1`, `esp.1` ou `bl1` para selecionar outra liga. Sem parâmetro, preserva o Brasileirão Série A como padrão. Competições fora do piloto retornam HTTP 400. A interface tem um seletor próprio de modelo, independente dos filtros de partidas.
+O endpoint usa `?competition=eng.1`, `esp.1` ou `bl1` para selecionar outra liga. Sem parâmetro, preserva o Brasileirão Série A como padrão. Competições fora do piloto retornam HTTP 400. A seção de probabilidades começa com os quatro campeonatos recolhidos. Ao abrir um campeonato, os jogos são consultados e agrupados por data de Brasília; ao abrir uma data e uma partida, aparecem as probabilidades compactas. Análise e avaliação ficam em áreas recolhidas. Os filtros de partidas são independentes dessa navegação.
 
 O modelo aprende os pesos de uma regressão logística multiclasse (softmax), com atualização sequencial e regularização L2, sem API de IA paga ou dependências externas.
 
