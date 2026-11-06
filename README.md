@@ -1,57 +1,77 @@
-# Football Betting Intelligence — versão 0.2
+# Football Betting Intelligence — versão 0.3
 
-Base de análise esportiva com partidas reais da Bundesliga, interface em português e histórico auditável. Não contém recomendação ou execução de apostas.
+Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não contém recomendação ou execução de apostas nem previsões treinadas.
 
 ## Executar
 
-Requer Node.js 24 (node:sqlite). Sem dependências externas.
+Requer Node.js 24, sem dependências externas.
 
-```
+```sh
 npm start
 ```
 
-Abra http://localhost:3000. `npm test` executa os testes. `npm run sync` atualiza a captura versionada de duas temporadas. O modo fictício só é ativado explicitamente por DATA_MODE=demo; o padrão é real.
+Abra http://localhost:3000. `npm test` executa a suíte. `npm run sync` consulta as fontes e atualiza as capturas versionadas. Em ambientes que exigem proxy HTTP, o Node 24 deve usar `NODE_USE_ENV_PROXY=1`, preservando os certificados e proxies fornecidos pelo ambiente.
 
-## Dados reais e cobertura
+`DATA_MODE=demo` ativa explicitamente seis partidas fictícias. O padrão é real. `DATA_DIR` define o diretório SQLite; o padrão é `runtime/`, ignorado pelo Git. Nenhuma chave é necessária para as integrações atuais.
 
-Fonte comunitária: [OpenLigaDB](https://www.openligadb.de/), [documentação](https://api.openligadb.de/index.html). A integração usa /getmatchdata/bl1/{temporada}. Não exige chave. A comunidade pode corrigir resultados; não é feed profissional nem cobertura ao vivo.
+## Cobertura
 
-Integrado: Bundesliga, temporada atual e anterior, partidas, equipes, datas UTC e resultado final por resultTypeID=2. O painel informa temporada, fonte, coleta e hash SHA-256. Resultados parciais nunca viram placares finais. Ausências são null, nunca zero inventado.
+| Campeonato | Fonte |
+| --- | --- |
+| Brasileirão Série A e Série B | ESPN |
+| Premier League, La Liga, Serie A italiana, Ligue 1 | ESPN |
+| Liga Portugal, Eredivisie | ESPN |
+| Champions League e Copa Libertadores | ESPN |
+| Bundesliga | OpenLigaDB |
 
-Pendente: Brasileirão A e B, Premier League, La Liga e Champions League. Não há cobertura integrada de escanteios, cartões, xG ou escalações. Não há modelo treinado nem previsões reais; Brier e log loss ficam sem resultado até existirem previsões válidas.
+A ESPN é acessada pelo endpoint público `https://site.api.espn.com/apis/site/v2/sports/soccer/{liga}/scoreboard?dates={ano}&limit=1000`. Não é uma API contratada nem há vínculo com a ESPN, SLA ou garantia de disponibilidade, completude ou direitos de redistribuição comercial. Antes de explorar comercialmente, validar as condições do fornecedor e substituir por um feed licenciado se necessário. OpenLigaDB é uma base comunitária: https://www.openligadb.de/ e https://api.openligadb.de/index.html.
 
-## Histórico e persistência
+O sincronizador consulta o ano civil atual e anterior na ESPN; cada evento preserva sua temporada própria. Uma temporada europeia cruza dois anos. Assim, a temporada mais antiga pode estar incompleta, e datas futuras ainda não publicadas não aparecem. Respostas com 1.000 eventos são rejeitadas como possivelmente truncadas. Bundesliga consulta a temporada atual e anterior. O painel exibe origem, data de coleta e anos consultados; não anuncia resultados como disponíveis antes da coleta bem-sucedida.
 
-SQLite armazena capturas brutas, SHA-256, horário de coleta, origem, partidas normalizadas e logs. Cada correção cria nova captura; uma semente antiga não sobrescreve um estado mais recente. Capturas brutas preservam a resposta original; a versão no arquivo data/openliga.json usa gzip/base64 e é validada antes da ingestão.
+Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios, cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
 
-O servidor abre a captura versionada ao iniciar, tenta atualizar a temporada atual e consulta novamente a cada seis horas enquanto está ativo. Falhas mantêm os últimos dados e geram log; não há substituição silenciosa por demonstração. A interface é uma fotografia da consulta; recarregue para obter os dados atualizados.
+## Site e instalação no celular
 
-**Render Free usa disco efêmero:** SQLite não sobrevive necessariamente a reinícios/publicações. A captura versionada é a recuperação mínima. O workflow Football data snapshots busca as duas temporadas às 06:17 e 18:17 UTC (03:17 e 15:17 de Brasília), testa e registra a captura no histórico Git, sujeito a habilitação, atrasos e cotas do GitHub Actions. Falhas de push (por exemplo, mudanças concorrentes) encerram a execução sem forçar sobrescrita. O workflow não garante disponibilidade contínua e o Render pode dormir. As execuções programadas ainda precisam de confirmação em produção.
+O site é responsivo, com filtros por campeonato, temporada, período, situação e equipe, paginação e exportação CSV. Horários e filtros de data usam Brasília. O botão Atualizar relê o estado do servidor; não dispara uma coleta externa.
 
-Para um histórico operacional completo e persistente, próximo passo: PostgreSQL externo e migrações. DATA_DIR permite usar um disco persistente quando houver; por padrão usa runtime/, ignorado pelo Git.
+Publicado em HTTPS, pode ser instalado como PWA: no Chrome do Android, menu ⋮ → Instalar aplicativo / Adicionar à tela inicial. Quando disponível, o site mostra um botão Instalar. No iPhone: Safari → Compartilhar → Adicionar à Tela de Início. Não é necessário instalar pela Play Store.
+
+Manifesto, ícones PNG e service worker estão incluídos. O cache guarda apenas a interface. As APIs não são armazenadas offline: sem rede, aparece uma mensagem de indisponibilidade, sem apresentar um placar antigo como atual. A instalação depende do navegador e de suas regras de elegibilidade. Não foi validada em um aparelho físico.
+
+Há também o projeto de APK Android WebView, apontando para `https://football-betting-intelligence.onrender.com/`. Veja [android/README.md](android/README.md). O APK depende desse site publicado; código Android não embute uma cópia da base de resultados.
+
+## Classificação
+
+Calculada por liga e temporada a partir dos resultados finais disponíveis. Exibe jogos, vitórias, empates, derrotas, gols, saldo, pontos e aproveitamento. Usa somente os filtros de campeonato e temporada. Copas exibem partidas e resultados, sem uma tabela única que misture fases e mata-mata.
+
+Vitória vale 3 pontos. Desempates: saldo, gols marcados e nome. Não é classificação oficial: não considera punições, divisão por fases ou critérios completos de cada competição. Temporadas parcialmente cobertas geram tabelas parciais, conforme informado na interface.
+
+## Histórico e atualização
+
+SQLite preserva a resposta original, SHA-256, fonte, horário e partidas normalizadas. Capturas são isoladas por fornecedor, competição e período; atualizar uma liga não apaga outra. A migração da versão anterior adiciona o escopo sem apagar o histórico. Capturas antigas não substituem dados recentes, mesmo com fusos e frações de segundo diferentes.
+
+O servidor carrega `data/openliga.json` e `data/espn.json`, com respostas gzip/base64 verificadas pelo hash. Ao iniciar e a cada seis horas, tenta atualizar as fontes. Falhas por liga são registradas e os dados anteriores permanecem disponíveis. O endpoint de cobertura informa defasagem por competição (>24h); datas de coleta não indicam garantia de correção dos resultados.
+
+O workflow Football data snapshots consulta as fontes às 06:17 e 18:17 UTC, testa e versiona as capturas. Falhas parciais preservam as capturas anteriores, publicam os sucessos após os testes e deixam o workflow com falha visível. GitHub Actions está sujeito a habilitação, atrasos e cotas. Não há push forçado.
+
+## Hospedagem
+
+Use Node 24, build `npm install`, start `npm start`, health check `/api/v1/health`. `render.yaml` descreve um serviço gratuito; não cria nem contrata um serviço por si só. O Dockerfile inclui os módulos e dados necessários, mas a imagem não foi compilada neste ambiente.
+
+**Render gratuito usa disco efêmero:** SQLite local pode ser perdido em reinícios ou publicações; capturas versionadas restauram a base mínima. Para histórico operacional durável, configure `DATA_DIR` em um disco persistente ou migre para um banco externo. Não há configuração de serviço pago neste projeto.
 
 ## API somente de leitura
 
-- GET /api/v1/health: versão e modo.
-- GET /api/v1/fixtures: partidas normalizadas.
-- GET /api/v1/data-status: cobertura, capturas recentes, integridade, falhas e defasagem (>24h).
-- GET /api/v1/evaluation: métricas de previsões previamente registradas, se existirem.
+- `GET /api/v1/health`: versão e modo.
+- `GET /api/v1/fixtures`: partidas e origem de cada registro.
+- `GET /api/v1/standings`: classificação calculada por liga/temporada, com regras explícitas.
+- `GET /api/v1/data-status`: cobertura por competição, períodos, defasagem, capturas e logs.
+- `GET /api/v1/evaluation`: métricas apenas de previsões previamente registradas; sem modelo, os resultados são nulos.
 
-Horários no painel: America/Sao_Paulo. Exportação CSV inclui origem, temporada e horário de coleta. Lista paginada de 50 em 50; CSV contém toda a seleção.
+A lista de arquivos públicos é fixa. SQLite, capturas brutas e credenciais não são expostos. APIs aceitam apenas GET. Não coloque senhas ou chaves no repositório.
 
-## Validação
+## Validação e limites
 
-Testes cobrem seleção do resultado final independente da ordem, ausências, erros HTTP, integridade de captura, correções, restauração SQLite, validação probabilística e HTTP. Ainda não há validação de modelo preditivo nem teste em aparelho Android. O aplicativo Android existente carrega o painel hospedado; veja android/README.md.
+`npm test` cobre as duas fontes, estados de partidas, placares finais, isolamento entre ligas, migração SQLite, correções, integridade, persistência, classificação, probabilidades e rotas HTTP, incluindo manifesto e ícones. Application tests roda em pushes para main e pull requests.
 
-## Infraestrutura
-
-Dockerfile com Node 24 incluído; Docker não foi executado neste ambiente. No Render: runtime Node, build npm install, start npm start, raiz vazia. .node-version e engines fixam Node 24. Nenhuma contratação nem credencial externa é necessária para esta fonte.
-
-## Próximos marcos
-
-1. Validar um fornecedor para Brasil A/B e campos adicionais.
-2. Migrar capturas e histórico operacional para PostgreSQL persistente.
-3. Desenvolver baselines de análise esportiva, treino com corte temporal, avaliação walk-forward e calibração.
-4. Validar prospectivamente os modelos antes de apresentar previsões reais.
-
-Não coloque senhas ou chaves no repositório. A API serve somente uma lista fixa de arquivos, não expõe SQLite ou respostas brutas e aceita apenas GET. Não há informações pessoais nem operações administrativas na aplicação.
+A interface, a instalação no Android e o APK ainda exigem verificação em navegador/aparelho real. Não há modelo preditivo validado. Próximas extensões: feed com contrato e cobertura garantida, tabelas oficiais por fase, persistência externa e modelos com avaliação temporal prospectiva.

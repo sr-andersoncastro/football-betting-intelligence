@@ -16,12 +16,18 @@ test('servidor entrega painel, dados e erros seguros',async()=>{
  try{
   const base='http://127.0.0.1:'+server.address().port;
   const health=await fetch(base+'/api/v1/health');assert.equal((await health.json()).mode,'real');
-  const fixtures=await fetch(base+'/api/v1/fixtures');const payload=await fixtures.json();assert.equal(payload.source,'OpenLigaDB');assert.ok(payload.fixtures.length>0);assert.ok(payload.fixtures.every(r=>r.source==='OpenLigaDB' && !r.prediction));
+  const fixtures=await fetch(base+'/api/v1/fixtures');const payload=await fixtures.json();assert.equal(payload.source,'OpenLigaDB + ESPN');assert.ok(payload.fixtures.length>0);assert.ok(payload.fixtures.every(r=>['OpenLigaDB','ESPN'].includes(r.source) && !r.prediction));
   const html=await fetch(base+'/');assert.match(await html.text(),/Partidas reais/);assert.match(html.headers.get('content-security-policy'),/frame-ancestors 'none'/);
-  for(const path of ['/app.js','/style.css','/lib.mjs'])assert.equal((await fetch(base+path)).status,200);
+  for(const path of ['/app.js','/style.css','/lib.mjs','/analytics.mjs','/sw.js','/manifest.webmanifest','/icon-192.png','/icon-512.png'])assert.equal((await fetch(base+path)).status,200);
+  const table=await fetch(base+'/api/v1/standings').then(r=>r.json());
+  assert.equal(table.source,'OpenLigaDB + ESPN');assert.ok(table.groups.length>0);
+  assert.ok(table.groups.every(g=>g.teams.every(t=>t.played===t.won+t.drawn+t.lost && t.points===3*t.won+t.drawn)));
   assert.equal((await fetch(base+'/api/v1/evaluation').then(r=>r.json())).count,0);
-  const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='BR-A' && c.status==='pending'));
+  const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='bra.1' && c.status==='available'));
+  const manifest=await fetch(base+'/manifest.webmanifest').then(r=>r.json());assert.equal(manifest.display,'standalone');assert.equal(manifest.icons.length,2);
+  assert.equal(audit.coverage.length,11);assert.ok(payload.fixtures.some(r=>r.competitionCode==='bra.2'));
   assert.equal((await fetch(base+'/.env')).status,404);
   assert.equal((await fetch(base+'/api/v1/fixtures',{method:'POST'})).status,405);
  }finally{await new Promise(resolve=>server.close(resolve));store.close();}
 });
+

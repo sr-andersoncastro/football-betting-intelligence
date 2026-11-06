@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: football-betting-intelligence
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: DATA_MODE
+        value: real

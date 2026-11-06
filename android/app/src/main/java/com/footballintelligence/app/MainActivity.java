@@ -80,3 +80,4 @@ public final class MainActivity extends Activity {
     @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
     @Override protected void onDestroy(){web.destroy();super.onDestroy();}
 }
+

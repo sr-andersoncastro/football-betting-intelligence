@@ -6,7 +6,7 @@ export function validateFixtures(rows) {
     ids.add(row.id);
     if (![row.home, row.away, row.competition].every(v => typeof v === 'string' && v.trim())) throw new Error('Equipe ou competição inválida');
     if (!Number.isFinite(Date.parse(row.kickoff))) throw new Error('Data inválida');
-    if (!['scheduled', 'finished'].includes(row.status)) throw new Error('Estado inválido');
+    if (!['scheduled', 'finished', 'live', 'postponed', 'cancelled', 'suspended'].includes(row.status)) throw new Error('Estado inválido');
     if (row.status === 'finished' && ![row.homeGoals, row.awayGoals].every(v => Number.isInteger(v) && v >= 0)) throw new Error('Estatística inválida');
     if (![row.corners, row.cards].every(v => v == null || (Number.isInteger(v) && v >= 0))) throw new Error('Estatística inválida');
     if (row.prediction) {
@@ -28,3 +28,4 @@ export function evaluate(rows) {
   }
   return { count: finished.length, brier: brier/finished.length, logLoss: logLoss/finished.length };
 }
+
