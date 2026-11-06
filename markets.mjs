@@ -1,5 +1,5 @@
 // Lightweight binary learning models; no LLM, external API, or betting execution.
-export const MARKET_GROUPS=[{code:'goals',name:'Gols',version:'goals-binary-v1',thresholds:[1.5,2.5,3.5],scale:6},{code:'corners',name:'Escanteios',version:'corners-binary-v1',thresholds:[8.5,9.5,10.5],scale:20}];
+export const MARKET_GROUPS=[{code:'goals',name:'Gols',version:'goals-binary-v1',thresholds:[1.5,2.5,3.5],scale:6},{code:'corners',name:'Escanteios',version:'corners-binary-v1',thresholds:[8.5,9.5,10.5],scale:20},{code:'fouls',name:'Faltas',version:'fouls-binary-v1',thresholds:[24.5,29.5,34.5],scale:60}];
 const teamId=(r,side)=>String(r[side+'TeamId']??r[side]);
 const sigmoid=z=>1/(1+Math.exp(-Math.max(-30,Math.min(30,z))));
 const dot=(w,x)=>w.reduce((sum,v,i)=>sum+v*x[i],0);

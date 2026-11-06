@@ -40,3 +40,13 @@ test('escanteios só geram probabilidades com valores observados para as duas eq
  assert.ok(g.markets[0].probability>=g.markets[1].probability&&g.markets[1].probability>=g.markets[2].probability);
  const absent=buildMarkets(rows(),now,'bra.1',[next]).predictions.get('next').find(g=>g.code==='corners');assert.equal(absent.status,'unavailable');assert.equal(absent.trainingMatches,0);
 });
+test('faltas mantêm histórico e avaliação próprios e não usam jogos sem contagem',()=>{
+ const counted=rows().map((r,i)=>({...r,homeFouls:11+i%5,awayFouls:10+i%7}));
+ const r=buildMarkets(counted,now,'bra.1',[next]),g=r.predictions.get('next').find(g=>g.code==='fouls');
+ assert.equal(g.status,'experimental');assert.equal(g.markets.length,3);validateExtraMarkets([g]);
+ assert.ok(g.markets[0].probability>=g.markets[1].probability&&g.markets[1].probability>=g.markets[2].probability);
+ assert.equal(r.evaluation.find(g=>g.code==='fouls').trainingMatches,220);
+ const absent=buildMarkets(rows(),now,'bra.1',[next]).predictions.get('next').find(g=>g.code==='fouls');assert.equal(absent.status,'unavailable');
+ const p={fixtureId:next.id,kickoff:next.kickoff,createdAt:now.toISOString(),extraMarkets:[g]},ended={...next,status:'finished',homeFouls:14,awayFouls:15};
+ const scored=evaluateRecordedMarkets([p],[ended],new Date('2026-11-08T12:00:00Z'),'bra.1').find(g=>g.code==='fouls');assert.ok(scored.markets.every(m=>m.count===1));
+});

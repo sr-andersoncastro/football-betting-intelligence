@@ -50,6 +50,7 @@ export function normalize(raw, code, calendarYear, collectedAt) {
     };
     const season=event.season.year;
     const homeCorners=statistic(home,'wonCorners',status==='finished'),awayCorners=statistic(away,'wonCorners',status==='finished');
+    const homeFouls=statistic(home,'foulsCommitted',status==='finished'),awayFouls=statistic(away,'foulsCommitted',status==='finished');
     return {
       id:`espn:${code}:${event.id}`,providerId:event.id,competition:league.name,competitionCode:code,
       season,seasonLabel:league.calendar?String(season):`${season}/${season+1}`,calendarYear,
@@ -57,6 +58,7 @@ export function normalize(raw, code, calendarYear, collectedAt) {
       homeTeamId:`espn:${home.team.id}`,awayTeamId:`espn:${away.team.id}`,
       kickoff:new Date(event.date).toISOString(),kickoffConfirmed:match.timeValid!==false,
       status,homeGoals:score(home),awayGoals:score(away),
+      homeFouls,awayFouls,fouls:homeFouls===null||awayFouls===null?null:homeFouls+awayFouls,
       homeCorners,awayCorners,corners:homeCorners===null||awayCorners===null?null:homeCorners+awayCorners,cards:null,source:'ESPN',collectedAt,tableEligible:!league.cup,
       resultType:state.name,venue:match.venue?.fullName??null
     };

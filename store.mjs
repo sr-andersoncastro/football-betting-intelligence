@@ -23,10 +23,10 @@ export class Store {
     this.db.exec(`CREATE INDEX IF NOT EXISTS captures_scope_time ON captures(scope,julianday(collected_at) DESC,id DESC,source,season,collected_at);
       CREATE INDEX IF NOT EXISTS captures_recent ON captures(julianday(collected_at) DESC,id DESC,source,url,season,scope,collected_at,sha256);`);
     // Re-normalize the latest original ESPN evidence after adding optional statistics.
-    if(this.db.prepare('PRAGMA user_version').get().user_version<1){
+    if(this.db.prepare('PRAGMA user_version').get().user_version<2){
       const latest=this.db.prepare("SELECT id FROM captures c WHERE source='ESPN' AND id=(SELECT id FROM captures WHERE scope=c.scope ORDER BY julianday(collected_at) DESC,id DESC LIMIT 1)").all();
       for(const {id} of latest){const c=this.db.prepare('SELECT source,url,season,collected_at AS collectedAt,sha256,raw,scope FROM captures WHERE id=?').get(id);this.ingest({...c,competitionCode:c.scope.split(':')[1]});}
-      this.db.exec('PRAGMA user_version=1');
+      this.db.exec('PRAGMA user_version=2');
     }
   }
   ingest(capture) {

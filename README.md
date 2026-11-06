@@ -1,4 +1,4 @@
-# Football Betting Intelligence — versão 0.7.0
+# Football Betting Intelligence — versão 0.8.0
 
 Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui modelos experimentais separados para Brasileirão Série A, Premier League, La Liga e Bundesliga.
 
@@ -28,7 +28,7 @@ A ESPN é acessada pelo endpoint público `https://site.api.espn.com/apis/site/v
 
 O sincronizador consulta o ano civil atual e anterior na ESPN; cada evento preserva sua temporada própria. Uma temporada europeia cruza dois anos. Assim, a temporada mais antiga pode estar incompleta, e datas futuras ainda não publicadas não aparecem. Respostas com 1.000 eventos são rejeitadas como possivelmente truncadas. Bundesliga consulta a temporada atual e anterior. O painel exibe origem, data de coleta e anos consultados; não anuncia resultados como disponíveis antes da coleta bem-sucedida.
 
-Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios são integrados quando a ESPN fornece contagens por equipe. A Bundesliga pela OpenLigaDB não fornece essa estatística. Cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
+Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios e faltas são integrados quando a ESPN fornece contagens por equipe. A Bundesliga pela OpenLigaDB não fornece essas estatísticas. Cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
 
 ## Site e instalação no celular
 
@@ -112,3 +112,11 @@ Os modelos têm avaliação histórica contra frequências anteriores e avaliaç
 O parser ESPN preserva `homeCorners`, `awayCorners` e o total apenas quando ambos os valores são informados para um jogo encerrado. Ausências, parciais, valores inválidos e campos duplicados não viram zero. Um zero explícito é preservado. A migração reprocessa a evidência original mais recente de cada período ESPN, sem substituir dados recentes por sementes antigas.
 
 Os modelos binários de escanteios estimam totais acima de 8,5, 9,5 e 10,5, separados por liga, com o mesmo corte temporal e limites mínimos de histórico usados nos gols. Usam escanteios recentes conquistados e cedidos por equipe e por mando. A Bundesliga permanece indisponível para esse mercado. A avaliação histórica e prospectiva é independente por limite e mercado.
+
+## Faltas: terceira etapa
+
+A integração ESPN preserva `homeFouls`, `awayFouls` e o total a partir de `foulsCommitted` para jogos encerrados. Ausência, ambiguidade e dados inválidos permanecem nulos; um zero informado é preservado. A migração reprocessa as capturas ESPN mais recentes sem alterar a evidência original.
+
+Modelos binários estimam totais acima de 24,5, 29,5 e 34,5 faltas. O histórico e os parâmetros são separados por liga e por mercado. Há os mesmos limites mínimos, suavização, corte temporal, ordenação dos totais e avaliações independentes das etapas anteriores. A Bundesliga permanece indisponível para escanteios e faltas. Não se inferem essas estatísticas a partir de gols.
+
+Após as três etapas, o benchmark local em 06/11/2026 teve mediana de 73,82 ms para calcular as quatro ligas, RSS de 279,22 MB após os cálculos e pico de 338,82 MB incluindo inicialização/migração. É medição local, não pico de produção nem teste de carga concorrente. Cada etapa foi publicada e verificada antes da seguinte, mantendo o plano gratuito.

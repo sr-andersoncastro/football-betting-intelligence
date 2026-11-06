@@ -76,3 +76,11 @@ test('nova versão reprocessa evidência ESPN recente sem substituí-la pela sem
   const migrated=new Store(path);try{assert.equal(migrated.fixtures()[0].corners,8);assert.equal(migrated.captures().length,1);}finally{migrated.close();}
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+test('faltas só usam valores explícitos e válidos do jogo encerrado',()=>{
+ const e=structuredClone(event);for(const [i,t] of e.competitions[0].competitors.entries())t.statistics=[{name:'foulsCommitted',displayValue:String(12+i)}];
+ const read=()=>normalize(response('bra.1',e),'bra.1',2026,'2026-11-06T10:00:00Z')[0];
+ assert.equal(read().homeFouls,13);assert.equal(read().awayFouls,12);assert.equal(read().fouls,25);
+ e.competitions[0].competitors[0].statistics[0].displayValue='';assert.equal(read().awayFouls,null);assert.equal(read().fouls,null);
+ e.competitions[0].competitors[0].statistics[0].displayValue='0';assert.equal(read().awayFouls,0);
+ e.competitions[0].competitors[0].statistics.push({name:'foulsCommitted',displayValue:'4'});assert.equal(read().awayFouls,null);
+});
