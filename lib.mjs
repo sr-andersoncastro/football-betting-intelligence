@@ -29,3 +29,27 @@ export function evaluate(rows) {
   return { count: finished.length, brier: brier/finished.length, logLoss: logLoss/finished.length };
 }
 
+
+// Most probable scenarios according to the experimental models. Not a recommendation: no odds, no value.
+const flip = label => label.startsWith('Mais de ') ? 'Menos de ' + label.slice(8) : 'Ambas as equipes marcam' === label ? 'Pelo menos uma equipe não marca' : 'Não: ' + label;
+export function scenarios(forecast, limit = 3) {
+  const {home, away, probabilities: p, evidence: ev} = forecast;
+  const pct = x => (100 * x).toFixed(0) + '%';
+  const best = [];
+  const outcomes = [
+    {label: 'Vitória do ' + home, probability: p[0], explanation: `${home} faz ${ev.home.venueLastTen.points.toFixed(2)} pontos/jogo em casa nos últimos 10 jogos suavizados; ${away} faz ${ev.away.venueLastTen.points.toFixed(2)} fora.`},
+    {label: 'Empate', probability: p[1], explanation: `Forma recente próxima: ${home} com ${ev.home.lastTen.points.toFixed(2)} e ${away} com ${ev.away.lastTen.points.toFixed(2)} pontos/jogo.`},
+    {label: 'Vitória do ' + away, probability: p[2], explanation: `${away} faz ${ev.away.venueLastTen.points.toFixed(2)} pontos/jogo fora nos últimos 10 jogos suavizados; ${home} faz ${ev.home.venueLastTen.points.toFixed(2)} em casa.`}
+  ].sort((a, b) => b.probability - a.probability)[0];
+  best.push({category: 'Resultado', ...outcomes});
+  for (const market of forecast.extraMarkets ?? []) {
+    if (market.status === 'unavailable' || !market.markets?.length) continue;
+    const picks = market.markets.map(m => m.probability >= m.oppositeProbability ? {label: m.label, probability: m.probability} : {label: flip(m.label), probability: m.oppositeProbability});
+    const top = picks.sort((a, b) => b.probability - a.probability)[0];
+    const explanation = market.code === 'goals'
+      ? `Média recente de gols marcados por jogo: ${home} ${ev.home.lastTen.goalsFor.toFixed(1)} e ${away} ${ev.away.lastTen.goalsFor.toFixed(1)}; sofridos: ${ev.home.lastTen.goalsAgainst.toFixed(1)} e ${ev.away.lastTen.goalsAgainst.toFixed(1)}.`
+      : `Estimativa de ${market.name.toLowerCase()} a partir do histórico recente das duas equipes (modelo treinado com ${market.trainingMatches} jogos da liga).`;
+    best.push({category: market.name, ...top, explanation});
+  }
+  return best.sort((a, b) => b.probability - a.probability).slice(0, limit).map(s => ({...s, text: pct(s.probability)}));
+}

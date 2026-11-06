@@ -90,3 +90,11 @@ aside{background:linear-gradient(180deg,#171539,#0f0e27);border-right:1px solid 
 @keyframes fab-float{50%{transform:translateY(-5px)}}@keyframes fab-in{from{opacity:0;transform:translateY(10px) scale(.9)}}
 @media(min-width:901px){.fab{bottom:28px;right:28px}}
 @media(prefers-reduced-motion:reduce){.fab-main,.fab-actions button{animation:none}}
+
+/* Cenários mais prováveis */
+.match-row .scenarios{grid-column:1/-1;margin-top:-4px}.scenarios>summary{font-size:13px;padding:6px 0;color:#cbbfff}
+.scenario-list{list-style:none;margin:6px 0;padding:0;display:grid;gap:10px}.scenario-list li{background:linear-gradient(160deg,#241f56,#16143a);border:1px solid #ffffff14;border-radius:12px;padding:10px 12px;box-shadow:0 1px 0 #ffffff1f inset}
+.scenario-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.scenario-cat{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#cbbfff;background:#ffffff14;border-radius:8px;padding:2px 7px}
+.scenario-top strong{flex:1;font-size:14px}.scenario-top b{color:var(--amber);font-size:16px}
+.scenario-bar{height:6px;background:#ffffff14;border-radius:4px;margin:8px 0 6px;overflow:hidden}.scenario-bar i{display:block;height:100%;background:linear-gradient(90deg,#7c5cff,#ff4d8d);border-radius:4px}
+.scenario-list p{margin:0;font-size:12px}
