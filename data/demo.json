@@ -1,0 +1,8 @@
+[
+ {"id":"demo-1","competition":"Brasileirão Série A","home":"Equipe Rio","away":"Equipe São Paulo","kickoff":"2026-11-01T19:00:00Z","status":"finished","homeGoals":2,"awayGoals":1,"corners":11,"cards":5,"prediction":{"probabilities":[0.5,0.28,0.22],"version":"baseline-demo-v1","createdAt":"2026-11-01T12:00:00Z"}},
+ {"id":"demo-2","competition":"Brasileirão Série B","home":"Equipe Recife","away":"Equipe Curitiba","kickoff":"2026-11-02T21:00:00Z","status":"finished","homeGoals":0,"awayGoals":0,"corners":8,"cards":6,"prediction":{"probabilities":[0.4,0.35,0.25],"version":"baseline-demo-v1","createdAt":"2026-11-02T12:00:00Z"}},
+ {"id":"demo-3","competition":"Premier League","home":"Equipe Londres","away":"Equipe Manchester","kickoff":"2026-11-03T20:00:00Z","status":"finished","homeGoals":1,"awayGoals":3,"corners":12,"cards":3,"prediction":{"probabilities":[0.3,0.25,0.45],"version":"baseline-demo-v1","createdAt":"2026-11-03T12:00:00Z"}},
+ {"id":"demo-4","competition":"La Liga","home":"Equipe Madri","away":"Equipe Barcelona","kickoff":"2026-11-10T20:00:00Z","status":"scheduled"},
+ {"id":"demo-5","competition":"Brasileirão Série A","home":"Equipe Belo Horizonte","away":"Equipe Porto Alegre","kickoff":"2026-11-11T22:00:00Z","status":"scheduled"},
+ {"id":"demo-6","competition":"Champions League","home":"Equipe Milão","away":"Equipe Munique","kickoff":"2026-11-12T20:00:00Z","status":"scheduled"}
+]

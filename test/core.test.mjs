@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {validateFixtures,evaluate} from '../lib.mjs';
+import {server} from '../server.mjs';
+const data=JSON.parse(await readFile(new URL('../data/demo.json',import.meta.url),'utf8'));
+test('dados demonstrativos íntegros',()=>assert.equal(validateFixtures(data).length,6));
+test('rejeita previsão posterior ao início',()=>{const rows=structuredClone(data);rows[0].prediction.createdAt=rows[0].kickoff;assert.throws(()=>validateFixtures(rows),/anteceder/);});
+test('rejeita probabilidades que não somam um',()=>{const rows=structuredClone(data);rows[0].prediction.probabilities=[0.9,0.9,0.9];assert.throws(()=>validateFixtures(rows),/Probabilidades/);});
+test('rejeita resultados negativos e IDs duplicados',()=>{const rows=structuredClone(data);rows[0].cards=-1;assert.throws(()=>validateFixtures(rows));assert.throws(()=>validateFixtures([data[0],data[0]]));});
+test('previsão perfeita tem perdas zero',()=>{const rows=structuredClone(data.slice(0,1));rows[0].prediction.probabilities=[1,0,0];assert.deepEqual(evaluate(rows),{count:1,brier:0,logLoss:0});});
+test('confere Brier e log loss contra resultado conhecido',()=>{const result=evaluate(data.slice(0,1));assert.ok(Math.abs(result.brier-0.3768)<1e-10);assert.ok(Math.abs(result.logLoss-Math.log(2))<1e-10);});
+test('amostra vazia não apresenta desempenho inventado',()=>assert.deepEqual(evaluate([]),{count:0,brier:null,logLoss:null}));
+test('servidor entrega painel, dados e erros seguros',async()=>{
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{
+  const base='http://127.0.0.1:'+server.address().port;
+  const health=await fetch(base+'/api/v1/health');assert.equal((await health.json()).mode,'demo');
+  const fixtures=await fetch(base+'/api/v1/fixtures');assert.equal((await fixtures.json()).fixtures.length,6);
+  const html=await fetch(base+'/');assert.match(await html.text(),/Todos os dados são fictícios/);assert.match(html.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  for(const path of ['/app.js','/style.css','/lib.mjs'])assert.equal((await fetch(base+path)).status,200);
+  assert.equal((await fetch(base+'/api/v1/evaluation').then(r=>r.json())).count,3);
+  assert.equal((await fetch(base+'/.env')).status,404);
+  assert.equal((await fetch(base+'/api/v1/fixtures',{method:'POST'})).status,405);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
