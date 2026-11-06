@@ -72,7 +72,7 @@ function coverageStatus(){
 const assets = new Map([['/manifest.webmanifest',['public/manifest.webmanifest','application/manifest+json']],['/sw.js',['public/sw.js','text/javascript; charset=utf-8']],['/icon-192.png',['public/icon-192.png','image/png']],['/icon-512.png',['public/icon-512.png','image/png']],['/', ['public/index.html','text/html; charset=utf-8']],['/analytics.mjs',['analytics.mjs','text/javascript; charset=utf-8']],['/lib.mjs',['lib.mjs','text/javascript; charset=utf-8']],['/app.js',['public/app.js','text/javascript; charset=utf-8']],['/style.css',['public/style.css','text/css; charset=utf-8']]]);
 export const server = http.createServer(async (req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; worker-src 'self'; manifest-src 'self'");
+  res.setHeader('Content-Security-Policy',"default-src 'self'; style-src 'self'; img-src 'self' https://a.espncdn.com https://upload.wikimedia.org; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; worker-src 'self'; manifest-src 'self'");
   res.setHeader('Cache-Control','no-store');
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');

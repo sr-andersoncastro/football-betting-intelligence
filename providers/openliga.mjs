@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { validateFixtures } from '../lib.mjs';
+import { validateFixtures, safeLogo } from '../lib.mjs';
 export const coverage = [
   {code:'bl1', name:'Bundesliga', status:'available'},
   {code:'BR-A', name:'Brasileirão Série A', status:'pending'},
@@ -18,6 +18,7 @@ export function normalize(raw, season, collectedAt) {
     return {
       id:`openliga:${match.matchID}`,providerId:match.matchID,competition:'Bundesliga',competitionCode:'bl1',season,
       home:match.team1?.teamName,away:match.team2?.teamName,
+      homeLogo:safeLogo(match.team1?.teamIconUrl),awayLogo:safeLogo(match.team2?.teamIconUrl),
       homeTeamId:match.team1?.teamId,awayTeamId:match.team2?.teamId,
       kickoff:match.matchDateTimeUTC,round:match.group?.groupOrderID??null,
       status:match.matchIsFinished?'finished':'scheduled',

@@ -106,3 +106,9 @@ dialog#scenario-dialog::backdrop{background:#05051099;backdrop-filter:blur(4px)}
 .scenario-game{border-top:1px solid #ffffff18;padding:14px 0}.scenario-game h3{margin:0;font-size:15px}.scenario-game p{margin:2px 0 8px}
 .scenario-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}.scenario-chip{background:linear-gradient(180deg,#2b2866,#1a1840);border-radius:12px;padding:10px 6px;text-align:center;box-shadow:0 1px 0 #ffffff2e inset,0 6px 12px -6px #000a}
 .scenario-chip span{display:block;font-size:11px;color:#b9b8dc;overflow-wrap:anywhere}.scenario-chip strong{display:block;font-size:20px;color:var(--amber);margin-top:4px}
+
+/* Escudos dos times */
+.crest{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;border-radius:50%;background:#ffffff14;box-shadow:0 1px 0 #ffffff33 inset,0 3px 6px -2px #000a;font-size:10px;font-weight:700;color:#cbbfff;vertical-align:middle;overflow:hidden}
+.crest img{width:20px;height:20px;object-fit:contain}
+.match-teams p{align-items:center;justify-content:flex-start;gap:10px}.match-teams p .team-name{flex:1}.match-teams p b{margin-left:auto}
+.scenario-game h3 .crest{width:22px;height:22px;margin:0 5px}.scenario-game h3 .crest img{width:17px;height:17px}

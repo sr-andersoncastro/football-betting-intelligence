@@ -1,3 +1,8 @@
+// Crests are only accepted from the two hosts the data sources serve them from.
+const logoHosts = new Set(['a.espncdn.com', 'upload.wikimedia.org']);
+export function safeLogo(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' && logoHosts.has(url.hostname) ? url.href : null; } catch { return null; }
+}
 export function validateFixtures(rows) {
   if (!Array.isArray(rows)) throw new Error('Lista de partidas inválida');
   const ids = new Set();

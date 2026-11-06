@@ -1,4 +1,4 @@
-const CACHE='football-five-scenarios-v1';
+const CACHE='football-crests-v1';
 const SHELL=['/','/style.css','/app.js','/lib.mjs','/analytics.mjs','/manifest.webmanifest','/icon-192.png','/icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
