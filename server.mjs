@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateFixtures, evaluate } from './lib.mjs';
 import { standings } from './analytics.mjs';
 import {buildForecast,evaluateRecorded,PILOT_LEAGUES} from './model.mjs';
+import {evaluateRecordedMarkets,validateExtraMarkets} from './markets.mjs';
 import {Store} from './store.mjs';
 import {collect} from './providers/openliga.mjs';
 import {collect as collectESPN,leagues} from './providers/espn.mjs';
@@ -29,7 +30,7 @@ if(!demo){
   try{
     const ledger=JSON.parse(await readFile(new URL('data/predictions.json',root),'utf8'));
     preservedPredictions=ledger.predictions.filter(p=>{
-      try{validateFixtures([{id:p.fixtureId,home:p.home,away:p.away,competition:'Brasileirão Série A',kickoff:p.kickoff,status:'scheduled',prediction:p}]);return Date.parse(p.createdAt)<=Date.now();}catch{return false;}
+      try{validateFixtures([{id:p.fixtureId,home:p.home,away:p.away,competition:'Brasileirão Série A',kickoff:p.kickoff,status:'scheduled',prediction:p}]);if(p.extraMarkets)validateExtraMarkets(p.extraMarkets);return Date.parse(p.createdAt)<=Date.now();}catch{return false;}
     });
   }catch(error){if(error.code!=='ENOENT')store.log('error','Registros de previsão: '+error.message);}
 }
@@ -42,7 +43,7 @@ function refreshForecast(){
   const archived=[...preservedPredictions,...store.predictions()];
   forecastReports=new Map(reports.map(report=>{
     report.forecasts=report.forecasts.map(p=>archived.find(a=>a.fixtureId===p.fixtureId&&a.version===p.version&&a.kickoff===p.kickoff&&a.dataHash===p.dataHash)??p);
-    return [report.competitionCode,{...report,prospectiveEvaluation:evaluateRecorded(archived,fixtures,now,report.competitionCode),storage:'Registros locais mais arquivo versionado no GitHub. O workflow preserva previsões periodicamente; registros locais ainda não versionados podem ser perdidos em reinícios.'}];
+    return [report.competitionCode,{...report,prospectiveEvaluation:evaluateRecorded(archived,fixtures,now,report.competitionCode),prospectiveMarkets:evaluateRecordedMarkets(archived,fixtures,now,report.competitionCode),storage:'Registros locais mais arquivo versionado no GitHub. O workflow preserva previsões periodicamente; registros locais ainda não versionados podem ser perdidos em reinícios.'}];
   }));
 }
 refreshForecast();
@@ -76,7 +77,7 @@ export const server = http.createServer(async (req,res)=>{
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');
   const json = value => {res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value));};
-  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.5.1'});
+  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.6.0'});
   if(url.pathname === '/api/v1/predictions'){
     if(demo)return json({status:'unavailable',reason:'Modelos exclusivos para dados reais das ligas do piloto.',forecasts:[]});
     const code=url.searchParams.get('competition')||'bra.1';

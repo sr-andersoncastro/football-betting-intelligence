@@ -1,4 +1,4 @@
-# Football Betting Intelligence — versão 0.5.1
+# Football Betting Intelligence — versão 0.6.0
 
 Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui modelos experimentais separados para Brasileirão Série A, Premier League, La Liga e Bundesliga.
 
@@ -100,3 +100,9 @@ A interface, a instalação no Android e o APK ainda exigem verificação em nav
 Execute `npm run benchmark` para comparar o cálculo de uma e quatro ligas em 10 execuções locais, com memória RSS e pico do processo. O script carrega as capturas e usa o mesmo código dos modelos. As probabilidades ficam calculadas em memória: consultas não treinam novamente, exceto no primeiro acesso após virar o dia UTC.
 
 Medição local em 06/11/2026 com Node 24.22.1 e 6.903 partidas: mediana de 6,03 ms para uma liga e 19,17 ms para quatro; RSS após os cálculos de 226,59 MB, pico de 271,05 MB no processo completo. A medição é do ambiente de desenvolvimento, não da RAM do Render, e não é teste de carga concorrente. O plano gratuito oferece 512 MB de RAM; nenhuma configuração paga foi ativada. Tempos de rede e limites da hospedagem devem ser acompanhados em produção antes de ampliar o piloto.
+
+## Probabilidades de gols
+
+Cada partida com histórico suficiente inclui modelos binários leves para mais de 1,5, 2,5 e 3,5 gols e ambas as equipes marcarem. O treino é separado por liga e usa gols recentes das equipes e dos adversários, com ponderação e suavização. Os mesmos cortes temporais de dia UTC e margem de 6 horas impedem usar resultados do próprio dia. São exigidos 160 jogos observados e 8 por equipe. Os limites de totais respeitam probabilidades monotônicas.
+
+Os modelos têm avaliação histórica contra frequências anteriores e avaliação prospectiva separada por mercado, sem duplicar jogos ou usar registros posteriores ao início. Brier binário varia de 0 a 1, diferente do Brier multiclasse do resultado. Registros com mercados adicionais são preservados no arquivo de previsões, sem alterar registros antigos. Modelos experimentais, sem comprovação de ganho futuro.

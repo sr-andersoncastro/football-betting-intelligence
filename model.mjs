@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {buildMarkets,MARKET_GROUPS} from './markets.mjs';
 
 export const MODEL_VERSION='br-a-softmax-v1';
 export const PILOT_LEAGUES=[
@@ -68,7 +69,7 @@ export function buildForecast(fixtures,now=new Date(),competitionCode='bra.1'){
   }
   for(const {r,f} of pending)observe(state,r,f.x);
   const model=metrics(records,'probabilities'),baseline=metrics(records,'baseline');
-  const dataHash=createHash('sha256').update(JSON.stringify(history.map(r=>[r.id,r.kickoff,r.homeTeamId??r.home,r.awayTeamId??r.away,r.homeGoals,r.awayGoals,r.collectedAt]))).digest('hex');
+  const dataHash=createHash('sha256').update(MARKET_GROUPS.map(g=>g.version).join('|')).update(JSON.stringify(history.map(r=>[r.id,r.kickoff,r.homeTeamId??r.home,r.awayTeamId??r.away,r.homeGoals,r.awayGoals,r.homeCorners??null,r.awayCorners??null,r.homeFouls??null,r.awayFouls??null,r.collectedAt]))).digest('hex');
   const latestDataAt=fixtures.filter(r=>r.competitionCode===competitionCode).map(r=>r.collectedAt).filter(v=>Number.isFinite(Date.parse(v))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??null;
   const dataStale=!latestDataAt||now.getTime()-Date.parse(latestDataAt)>24*3600000||Date.parse(latestDataAt)>now.getTime();
   const forecasts=[],unavailable=[];
@@ -78,7 +79,9 @@ export function buildForecast(fixtures,now=new Date(),competitionCode='bra.1'){
     if(!f.sufficient){unavailable.push({fixtureId:row.id,reason:'Histórico insuficiente: exige 160 jogos de treino e 8 jogos anteriores por equipe.'});continue;}
     forecasts.push({fixtureId:row.id,home:row.home,away:row.away,kickoff:row.kickoff,version:league.version,competitionCode,createdAt,trainingCutoff:cutoff,trainingMatches:history.length,dataHash,probabilities:probabilities(state.weights,f.x),evidence:f.evidence,status:'experimental'});
   }
+  const extra=buildMarkets(fixtures,now,competitionCode,forecasts.map(p=>fixtures.find(r=>r.id===p.fixtureId)));
+  for(const p of forecasts)p.extraMarkets=extra.predictions.get(p.fixtureId)??[];
   return {version:league.version,competitionCode,competition:league.name,status:'experimental',createdAt,trainingCutoff:cutoff,latestDataAt,dataStale,trainingMatches:history.length,dataHash,featureNames:FEATURE_NAMES,weights:state.weights,
-    forecasts,unavailable,walkForward:{records,method:'Treino sequencial por dia UTC, sem resultados do mesmo dia ou de dias futuros; margem de 6 horas após o início antes de incorporar um resultado. Dados retrospectivos sujeitos às correções atuais da fonte; não equivale a previsões registradas no passado.',model,baseline,betterThanBaseline:model.count>=200&&model.brier<baseline.brier&&model.logLoss<baseline.logLoss},
+    forecasts,unavailable,marketEvaluation:extra.evaluation,walkForward:{records,method:'Treino sequencial por dia UTC, sem resultados do mesmo dia ou de dias futuros; margem de 6 horas após o início antes de incorporar um resultado. Dados retrospectivos sujeitos às correções atuais da fonte; não equivale a previsões registradas no passado.',model,baseline,betterThanBaseline:model.count>=200&&model.brier<baseline.brier&&model.logLoss<baseline.logLoss},
     limitations:['Somente resultados, forma recente, mando e Elo; sem lesões, suspensões ou escalações.','Histórico recente de até 10 jogos com suavização; a amostra disponível limita a aprendizagem.','Probabilidades experimentais, sem garantia de acerto ou ganho.']};
 }

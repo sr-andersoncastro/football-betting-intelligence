@@ -4,6 +4,7 @@ import {normalize} from './providers/openliga.mjs';
 import {normalize as normalizeESPN} from './providers/espn.mjs';
 import {validateFixtures} from './lib.mjs';
 import {PILOT_LEAGUES} from './model.mjs';
+import {validateExtraMarkets} from './markets.mjs';
 export class Store {
   constructor(path=':memory:') {
     this.db=new DatabaseSync(path);
@@ -56,7 +57,7 @@ export class Store {
     const eligible=predictions.map(p=>{
       const match=matches.get(p.fixtureId);
       if(!match||!PILOT_LEAGUES.some(l=>l.code===match.competitionCode&&l.version===p.version)||match.status!=='scheduled'||p.kickoff!==match.kickoff||Date.parse(p.kickoff)<=now.getTime()||!p.dataHash||Date.parse(p.createdAt)>now.getTime())throw new Error('Registro de previsão inválido');
-      validateFixtures([{...match,prediction:p}]);return p;
+      validateFixtures([{...match,prediction:p}]);if(p.extraMarkets)validateExtraMarkets(p.extraMarkets);return p;
     });
     this.db.exec('BEGIN');
     try{

@@ -52,6 +52,14 @@ function renderLeagueReport(report,body){
       match.details.append(chances);
       const explanation=fold('Ver análise e registro','prediction-explanation'),h=f.evidence.home,a=f.evidence.away;
       explanation.details.append(text('p',`Forma recente suavizada: ${f.home}, ${h.lastTen.points.toFixed(2)} pontos/jogo; ${f.away}, ${a.lastTen.points.toFixed(2)}. No mando desta partida: ${h.venueLastTen.points.toFixed(2)} em casa e ${a.venueLastTen.points.toFixed(2)} fora.`),text('p','Registro: '+date(f.createdAt)+' · Histórico anterior a '+date(f.trainingCutoff)+' · Modelo '+f.version,'muted'));
+      for(const market of f.extraMarkets??[]){
+        const section=fold(market.name+' · experimental','prediction-market');
+        if(market.status==='unavailable')section.details.append(text('p',market.reason,'muted'));
+        else for(const m of market.markets){const line=text('div','','market-line');line.append(text('span',m.label),text('strong','Sim '+(100*m.probability).toFixed(1)+'% · Não '+(100*m.oppositeProbability).toFixed(1)+'%'));section.details.append(line);}
+        const history=report.marketEvaluation?.find(e=>e.code===market.code),check=fold('Ver teste histórico e acompanhamento','prediction-explanation');
+        for(const e of history?.markets??[]){const future=report.prospectiveMarkets?.find(g=>g.code===market.code)?.markets.find(m=>m.id===e.id);check.details.append(text('p',`${e.label}: ${e.model.count} jogos históricos; Brier binário ${e.model.brier?.toFixed(3)??'—'}, referência ${e.baseline.brier?.toFixed(3)??'—'}; ${future?.count??0} previsões futuras avaliadas.`));}
+        check.details.append(text('p','Aprendizado binário experimental; Brier de 0 a 1. O teste histórico é retrospectivo, sem comprovação de acerto futuro.','muted'));section.details.append(check.details);match.details.append(section.details);
+      }
       match.details.append(explanation.details);group.details.append(match.details);
     }
     body.append(group.details);
