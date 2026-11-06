@@ -169,11 +169,30 @@ $('menu').addEventListener('click',()=>drawer(!$('drawer').classList.contains('o
 $('scrim').addEventListener('click',()=>drawer(false));
 $('drawer').addEventListener('click',event=>{if(event.target.closest('a'))drawer(false);});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')drawer(false);});
+function openScenarios(){
+  const body=$('scenario-body');body.replaceChildren();
+  const games=selected.filter(r=>r.status==='scheduled'&&oddsByMatch.has(matchKey(r)));
+  $('scenario-sub').textContent=games.length?games.length+' jogo(s) da seleção atual, com horário de Brasília. Mude a data ou os filtros para ver outros jogos.':'';
+  for(const r of games){
+    const f=oddsByMatch.get(matchKey(r)),card=text('section','','scenario-game');
+    card.append(text('h3',timeOnly(r.kickoff)+' · '+r.home+' × '+r.away),text('p',r.competition,'muted'));
+    const chips=text('div','','scenario-chips');
+    [['Vitória '+r.home,0],['Empate',1],['Vitória '+r.away,2]].forEach(([label,i])=>{const chip=text('div','','scenario-chip');chip.append(text('span',label),text('strong',Math.round(100*f.probabilities[i])+'%'));chips.append(chip);});
+    const list=text('ol','','scenario-list');
+    for(const sc of scenarios(f,4)){const item=text('li','');const top=text('div','','scenario-top');top.append(text('span',sc.category,'scenario-cat'),text('strong',sc.label),text('b',sc.text));const bar=text('div','','scenario-bar'),fill=text('i','');fill.style.width=sc.text;bar.append(fill);item.append(top,bar,text('p',sc.explanation));list.append(item);}
+    card.append(chips,list);body.append(card);
+  }
+  if(!games.length)body.append(text('p','Nenhum jogo agendado com probabilidades nesta seleção. As previsões existem para Brasileirão Série A, Premier League, La Liga e Bundesliga, nos próximos 7 dias.','empty'));
+  $('scenario-dialog').showModal();
+}
+$('scenario-close').addEventListener('click',()=>$('scenario-dialog').close());
+$('scenario-dialog').addEventListener('click',event=>{if(event.target===$('scenario-dialog'))$('scenario-dialog').close();});
 const fab=open=>{$('fab-actions').hidden=!open;$('fab-main').setAttribute('aria-expanded',String(open));$('fab').classList.toggle('open',open);};
 $('fab-main').addEventListener('click',()=>fab($('fab-actions').hidden));
 $('fab-actions').addEventListener('click',event=>{
   const act=event.target.closest('button')?.dataset.act;if(!act)return;
   if(act==='top')window.scrollTo({top:0,behavior:'smooth'});
+  else if(act==='scenarios')openScenarios();
   else if(act==='refresh')$('refresh').click();
   else if(act==='export'&&!$('export').disabled)$('export').click();
   fab(false);
