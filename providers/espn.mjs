@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {validateFixtures} from '../lib.mjs';
+import {validateFixtures,safeLogo} from '../lib.mjs';
 
 export const leagues = [
   {code:'bra.1',name:'Brasileirão Série A',calendar:true},
@@ -58,6 +58,7 @@ export function normalize(raw, code, calendarYear, collectedAt) {
       id:`espn:${code}:${event.id}`,providerId:event.id,competition:league.name,competitionCode:code,
       season,seasonLabel:league.calendar?String(season):`${season}/${season+1}`,calendarYear,
       home:home.team.displayName,away:away.team.displayName,
+      homeLogo:safeLogo(home.team.logo),awayLogo:safeLogo(away.team.logo),
       homeTeamId:`espn:${home.team.id}`,awayTeamId:`espn:${away.team.id}`,
       kickoff:new Date(event.date).toISOString(),kickoffConfirmed:match.timeValid!==false,
       status,homeGoals:score(home),awayGoals:score(away),

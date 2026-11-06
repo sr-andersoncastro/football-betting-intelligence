@@ -9,6 +9,12 @@ const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',y
 const today=()=>day(new Date());
 const offsetDay=n=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return day(d);};
 const text=(tag,value,className)=>{const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;};
+function crest(url,name){
+  const box=text('span','','crest'),initials=()=>box.replaceChildren(text('span',name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toLocaleUpperCase('pt-BR')));
+  if(!url){initials();return box;}
+  const img=document.createElement('img');img.src=url;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',initials,{once:true});box.append(img);return box;
+}
+const teamLine=(tag,url,name)=>{const line=text(tag,'');line.append(crest(url,name),text('span',name,'team-name'));return line;};
 const timeOnly=v=>new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}).format(new Date(v));
 const matchKey=r=>r.fixtureId??r.id;
 const statuses={scheduled:'Agendada',finished:'Encerrada',live:'Em andamento na coleta',postponed:'Adiada',cancelled:'Cancelada',suspended:'Suspensa'};
@@ -134,7 +140,7 @@ function render(){
       else if(r.status!=='scheduled')when.append(text('strong',statuses[r.status]));
       else when.append(text('strong',r.kickoffConfirmed===false?'A conf.':timeOnly(r.kickoff)));
       if(period!=='day')when.append(text('small',new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'}).format(new Date(r.kickoff))));
-      const teams=text('div','','match-teams'),h=text('p',r.home),a=text('p',r.away);
+      const teams=text('div','','match-teams'),h=teamLine('p',r.homeLogo,r.home),a=teamLine('p',r.awayLogo,r.away);
       if(r.status==='finished'){h.append(text('b',String(r.homeGoals)));a.append(text('b',String(r.awayGoals)));}
       teams.append(h,a);
       const meta=[r.venue,r.source&&r.source+' · coleta '+date(r.collectedAt)].filter(Boolean).join(' · ');
@@ -184,7 +190,7 @@ function openScenarios(){
   $('scenario-sub').textContent=games.length?games.length+' jogo(s) da seleção atual. Até cinco cenários individuais por jogo, conforme os dados disponíveis. Horários de Brasília.':'';
   for(const r of games){
     const f=oddsByMatch.get(matchKey(r)),card=text('section','','scenario-game');
-    card.append(text('h3',timeOnly(r.kickoff)+' · '+r.home+' × '+r.away),text('p',r.competition,'muted'));
+    const title=text('h3','');title.append(text('span',timeOnly(r.kickoff)+' · '),crest(r.homeLogo,r.home),text('span',r.home),text('span',' × '),crest(r.awayLogo,r.away),text('span',r.away));card.append(title,text('p',r.competition,'muted'));
     const chips=text('div','','scenario-chips');
     [['Vitória '+r.home,0],['Empate',1],['Vitória '+r.away,2]].forEach(([label,i])=>{const chip=text('div','','scenario-chip');chip.append(text('span',label),text('strong',Math.round(100*f.probabilities[i])+'%'));chips.append(chip);});
     const list=scenarioList(f);
