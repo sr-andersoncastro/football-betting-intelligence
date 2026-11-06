@@ -36,9 +36,9 @@ function renderStandings(){
 function renderModel(){
   $('predictions').replaceChildren();$('model-scores').replaceChildren();
   const report=forecastReport;
-  if(!report?.walkForward){$('model-notice').textContent='Modelo disponível somente com dados reais do Brasileirão Série A.';return;}
+  if(!report?.walkForward){$('model-notice').textContent='Modelos disponíveis somente com dados reais das quatro ligas do piloto.';return;}
   const p=report.prospectiveEvaluation,w=report.walkForward;
-  $('model-notice').textContent=`Aprendizado de máquina experimental · ${report.trainingMatches} partidas no treino · Coleta: ${report.latestDataAt?date(report.latestDataAt):'indisponível'} · ${report.dataStale?'Coleta defasada: previsões suspensas.':'Resultados recentes, mando de campo e força das equipes.'}`;
+  $('model-notice').textContent=`${report.competition??'Brasileirão Série A'} · modelo experimental · ${report.trainingMatches} partidas no treino · Coleta: ${report.latestDataAt?date(report.latestDataAt):'indisponível'} · ${report.dataStale?'Coleta defasada: previsões suspensas.':'Resultados recentes, mando de campo e força das equipes.'}`;
   for(const f of report.forecasts){
     const card=text('article','','prediction');card.append(text('h3',f.home+' × '+f.away),text('p',date(f.kickoff)+' · Brasília'));
     const probabilities=text('div','','metrics');
@@ -93,7 +93,7 @@ $('export').addEventListener('click',()=>{
 async function load(){
  $('refresh').disabled=true;
  try{
-  const [response,statusResponse,modelResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status'),fetch('/api/v1/predictions').catch(()=>null)]);if(!response.ok||!statusResponse.ok)throw new Error('Falha na consulta');
+  const [response,statusResponse,modelResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status'),fetch('/api/v1/predictions?competition='+encodeURIComponent($('model-competition').value)).catch(()=>null)]);if(!response.ok||!statusResponse.ok)throw new Error('Falha na consulta');
   const status=await statusResponse.json();mode=status.mode;rows=(await response.json()).fixtures;
   forecastReport=modelResponse?.ok?await modelResponse.json():null;renderModel();
   $('mode').textContent=mode==='demo'?'● DEMONSTRAÇÃO':'● DADOS REAIS';
@@ -110,6 +110,17 @@ async function load(){
  }catch{ $('notice').textContent='Sem conexão com os dados. Os resultados não estão disponíveis offline.';$('mode').textContent='● SEM CONEXÃO';rows=[];selected=[];$('metrics').replaceChildren();$('scores').replaceChildren();$('standings').replaceChildren();$('predictions').replaceChildren();$('model-scores').replaceChildren();$('model-notice').textContent='Probabilidades indisponíveis sem conexão.';$('fixtures').textContent='Não foi possível carregar as partidas. Toque em Atualizar para tentar novamente.';$('export').disabled=true;$('more').hidden=true;}
  finally{$('refresh').disabled=false;}
 }
+let modelRequest;
+$('model-competition').addEventListener('change',async()=>{
+  modelRequest?.abort();const request=new AbortController();modelRequest=request;
+  $('model-notice').textContent='Consultando o modelo deste campeonato…';$('predictions').replaceChildren();
+  try{
+    const response=await fetch('/api/v1/predictions?competition='+encodeURIComponent($('model-competition').value),{signal:request.signal});
+    if(!response.ok)throw new Error('Falha ao consultar');
+    const report=await response.json();if(request.signal.aborted)return;
+    forecastReport=report;renderModel();
+  }catch(error){if(error.name!=='AbortError'){$('model-notice').textContent='Não foi possível consultar este modelo. Tente Atualizar.';$('model-scores').replaceChildren();}}
+});
 $('refresh').addEventListener('click',load);
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installation=event;$('install').hidden=false;});
 $('install').addEventListener('click',async()=>{if(installation){await installation.prompt();await installation.userChoice;installation=null;$('install').hidden=true;}});

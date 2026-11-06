@@ -26,6 +26,8 @@ test('servidor entrega painel, dados e erros seguros',async()=>{
   const prediction=await fetch(base+'/api/v1/predictions').then(r=>r.json());
   assert.equal(prediction.competitionCode,'bra.1');assert.equal(prediction.status,'experimental');assert.ok(prediction.trainingMatches>160);assert.ok(prediction.walkForward.model.count>0);
   assert.ok(prediction.forecasts.every(p=>p.probabilities.length===3 && Date.parse(p.createdAt)<Date.parse(p.kickoff)));
+  for(const code of ['eng.1','esp.1','bl1']){const league=await fetch(base+'/api/v1/predictions?competition='+code).then(r=>r.json());assert.equal(league.competitionCode,code);assert.equal(league.pilot.length,4);assert.ok(league.trainingMatches>160);assert.ok(league.forecasts.every(p=>p.competitionCode===code));}
+  assert.equal((await fetch(base+'/api/v1/predictions?competition=bra.2')).status,400);
   const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='bra.1' && c.status==='available'));
   const manifest=await fetch(base+'/manifest.webmanifest').then(r=>r.json());assert.equal(manifest.display,'standalone');assert.equal(manifest.icons.length,2);
   assert.equal(audit.coverage.length,11);assert.ok(payload.fixtures.some(r=>r.competitionCode==='bra.2'));

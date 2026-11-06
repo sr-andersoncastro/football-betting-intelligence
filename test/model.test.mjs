@@ -61,3 +61,23 @@ test('avaliação prospectiva separa previsões registradas de simulações e ev
  assert.equal(evaluateRecorded([{...p,createdAt:'2026-11-08T00:00:00Z'}],[finished],at).count,0);
  assert.equal(evaluateRecorded([p],[{...finished,kickoff:'2026-11-08T20:00:00Z'}],at).count,0);
 });
+test('cada liga treina somente com seu histórico mesmo com IDs de equipes iguais',()=>{
+ const local=history(),foreign=history().map(r=>({...r,id:'eng:'+r.id,competitionCode:'eng.1',competition:'Premier League',homeGoals:0,awayGoals:5}));
+ const brazil=buildForecast([...local,...foreign,future],now,'bra.1');
+ assert.deepEqual(brazil.weights,buildForecast([...local,future],now).weights);
+ const england=buildForecast([...local,...foreign,{...future,id:'eng:next',competitionCode:'eng.1'}],now,'eng.1');
+ assert.equal(england.trainingMatches,240);assert.equal(england.forecasts.length,1);assert.equal(england.version,'eng-1-softmax-v1');
+ assert.notDeepEqual(england.weights,brazil.weights);
+ assert.throws(()=>buildForecast(local,now,'bra.2'),/fora do piloto/);
+});
+test('registro e avaliação permanecem separados por liga e versão',()=>{
+ const rows=history().map(r=>({...r,competitionCode:'eng.1'})),match={...future,competitionCode:'eng.1'},fixtures=[...rows,match];
+ const p=buildForecast(fixtures,now,'eng.1').forecasts[0],db=new Store();
+ try{
+  db.savePredictions([p],fixtures,now);assert.equal(db.predictions().length,1);
+  assert.throws(()=>db.savePredictions([{...p,version:MODEL_VERSION}],fixtures,now),/inválido/);
+  const finished={...match,status:'finished',homeGoals:1,awayGoals:0},after=new Date('2026-11-08T12:00:00Z');
+  assert.equal(evaluateRecorded([p],[finished],after,'eng.1').count,1);
+  assert.equal(evaluateRecorded([p],[finished],after,'bra.1').count,0);
+ }finally{db.close();}
+});

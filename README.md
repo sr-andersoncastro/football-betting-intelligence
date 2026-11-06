@@ -1,6 +1,6 @@
-# Football Betting Intelligence — versão 0.4
+# Football Betting Intelligence — versão 0.5
 
-Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui um modelo experimental para o Brasileirão Série A.
+Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui modelos experimentais separados para Brasileirão Série A, Premier League, La Liga e Bundesliga.
 
 ## Executar
 
@@ -40,9 +40,13 @@ Manifesto, ícones PNG e service worker estão incluídos. O cache guarda apenas
 
 Há também o projeto de APK Android WebView, apontando para `https://football-betting-intelligence.onrender.com/`. Veja [android/README.md](android/README.md). O APK depende desse site publicado; código Android não embute uma cópia da base de resultados.
 
-## Probabilidades do Brasileirão Série A
+## Probabilidades: piloto com quatro ligas
 
-`GET /api/v1/predictions` retorna probabilidades experimentais de vitória da casa, empate e vitória visitante para partidas agendadas nos próximos 7 dias, com horário confirmado e coleta de até 24 horas. Nenhuma outra liga recebe previsões. O modelo aprende os pesos de uma regressão logística multiclasse (softmax), com atualização sequencial e regularização L2, sem API de IA paga ou dependências externas.
+`GET /api/v1/predictions` retorna probabilidades experimentais de vitória da casa, empate e vitória visitante para partidas agendadas nos próximos 7 dias, com horário confirmado e coleta de até 24 horas. O piloto cobre somente Brasileirão Série A (`bra.1`), Premier League (`eng.1`), La Liga (`esp.1`) e Bundesliga (`bl1`). Cada liga tem pesos, histórico, versão e avaliação próprios; resultados de uma não entram no treino de outra. As demais competições continuam disponíveis para consulta, sem previsões.
+
+O endpoint usa `?competition=eng.1`, `esp.1` ou `bl1` para selecionar outra liga. Sem parâmetro, preserva o Brasileirão Série A como padrão. Competições fora do piloto retornam HTTP 400. A interface tem um seletor próprio de modelo, independente dos filtros de partidas.
+
+O modelo aprende os pesos de uma regressão logística multiclasse (softmax), com atualização sequencial e regularização L2, sem API de IA paga ou dependências externas.
 
 Usa desempenho recente (últimos 10 jogos, pesos decrescentes e suavização), gols marcados/sofridos, desempenho em casa/fora e Elo atualizado com resultados anteriores. Exige pelo menos 160 partidas no treino e 8 jogos anteriores por equipe. Não usa escalações, notícias, lesões, suspensões ou odds e não compara valor de apostas.
 
@@ -77,7 +81,7 @@ Use Node 24, build `npm install`, start `npm start`, health check `/api/v1/healt
 ## API somente de leitura
 
 - `GET /api/v1/health`: versão e modo.
-- `GET /api/v1/predictions`: modelo da Série A, previsões, teste temporal e avaliação prospectiva.
+- `GET /api/v1/predictions`: modelo selecionado do piloto, previsões, teste temporal e avaliação prospectiva.
 - `GET /api/v1/fixtures`: partidas e origem de cada registro.
 - `GET /api/v1/standings`: classificação calculada por liga/temporada, com regras explícitas.
 - `GET /api/v1/data-status`: cobertura por competição, períodos, defasagem, capturas e logs.
@@ -89,4 +93,10 @@ A lista de arquivos públicos é fixa. SQLite, capturas brutas e credenciais nã
 
 `npm test` cobre as duas fontes, estados de partidas, placares finais, isolamento entre ligas, migração SQLite, correções, integridade, persistência, classificação, probabilidades e rotas HTTP, incluindo manifesto e ícones. Application tests roda em pushes para main e pull requests.
 
-A interface, a instalação no Android e o APK ainda exigem verificação em navegador/aparelho real. O modelo da Série A ainda exige validação prospectiva. Próximas extensões: feed com contrato e cobertura garantida, tabelas oficiais por fase, persistência externa e modelos com avaliação temporal prospectiva.
+A interface, a instalação no Android e o APK ainda exigem verificação em navegador/aparelho real. Os modelos do piloto ainda exigem validação prospectiva. Próximas extensões: feed com contrato e cobertura garantida, tabelas oficiais por fase, persistência externa e modelos com avaliação temporal prospectiva.
+
+## Medição de desempenho do piloto
+
+Execute `npm run benchmark` para comparar o cálculo de uma e quatro ligas em 10 execuções locais, com memória RSS e pico do processo. O script carrega as capturas e usa o mesmo código dos modelos. As probabilidades ficam calculadas em memória: consultas não treinam novamente, exceto no primeiro acesso após virar o dia UTC.
+
+Medição local em 06/11/2026 com Node 24.22.1 e 6.903 partidas: mediana de 6,03 ms para uma liga e 19,17 ms para quatro; RSS após os cálculos de 226,59 MB, pico de 271,05 MB no processo completo. A medição é do ambiente de desenvolvimento, não da RAM do Render, e não é teste de carga concorrente. O plano gratuito oferece 512 MB de RAM; nenhuma configuração paga foi ativada. Tempos de rede e limites da hospedagem devem ser acompanhados em produção antes de ampliar o piloto.

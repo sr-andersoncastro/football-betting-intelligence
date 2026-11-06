@@ -1,6 +1,13 @@
 import {createHash} from 'node:crypto';
 
 export const MODEL_VERSION='br-a-softmax-v1';
+export const PILOT_LEAGUES=[
+  {code:'bra.1',name:'Brasileirão Série A',version:MODEL_VERSION},
+  {code:'eng.1',name:'Premier League',version:'eng-1-softmax-v1'},
+  {code:'esp.1',name:'La Liga',version:'esp-1-softmax-v1'},
+  {code:'bl1',name:'Bundesliga',version:'bl1-softmax-v1'}
+];
+function leagueFor(code){const league=PILOT_LEAGUES.find(l=>l.code===code);if(!league)throw new Error('Competição fora do piloto');return league;}
 const MIN_TRAINING=160, MIN_TEAM_MATCHES=8;
 export const FEATURE_NAMES=['intercepto / mando','diferença de pontos recentes','diferença de gols marcados','diferença de gols sofridos','desempenho casa / fora','diferença Elo'];
 const key=(r,side)=>String(r[side+'TeamId']??r[side]);
@@ -38,16 +45,18 @@ function metrics(records,field){
   for(const r of records){const p=r[field],winner=p.indexOf(Math.max(...p));brier+=p.reduce((s,v,i)=>s+(v-(i===r.outcome?1:0))**2,0);logLoss-=Math.log(Math.max(1e-15,p[r.outcome]));hits+=winner===r.outcome?1:0;const bin=bins[Math.min(4,Math.floor(p[winner]*5))];bin.count++;bin.predictedSum+=p[winner];bin.hits+=winner===r.outcome?1:0;}
   return {count:records.length,brier:brier/records.length,logLoss:logLoss/records.length,accuracy:hits/records.length,calibration:bins.map(b=>({from:b.from,to:b.to,count:b.count,meanProbability:b.count?b.predictedSum/b.count:null,observedFrequency:b.count?b.hits/b.count:null}))};
 }
-export function evaluateRecorded(predictions,fixtures,now=new Date()){
-  const rows=new Map(fixtures.filter(r=>r.competitionCode==='bra.1'&&r.status==='finished'&&Date.parse(r.kickoff)<now.getTime()).map(r=>[r.id,r]));
+export function evaluateRecorded(predictions,fixtures,now=new Date(),competitionCode='bra.1'){
+  const league=leagueFor(competitionCode);
+  const rows=new Map(fixtures.filter(r=>r.competitionCode===competitionCode&&r.status==='finished'&&Date.parse(r.kickoff)<now.getTime()).map(r=>[r.id,r]));
   const latest=new Map();
-  for(const p of predictions){const r=rows.get(p.fixtureId);if(!r||p.kickoff!==r.kickoff||Date.parse(p.createdAt)>=Date.parse(r.kickoff)||p.version!==MODEL_VERSION)continue;const previous=latest.get(r.id);if(!previous||Date.parse(p.createdAt)>Date.parse(previous.createdAt))latest.set(r.id,p);}
+  for(const p of predictions){const r=rows.get(p.fixtureId);if(!r||p.kickoff!==r.kickoff||Date.parse(p.createdAt)>=Date.parse(r.kickoff)||p.version!==league.version)continue;const previous=latest.get(r.id);if(!previous||Date.parse(p.createdAt)>Date.parse(previous.createdAt))latest.set(r.id,p);}
   return metrics([...latest.values()].map(p=>({probabilities:p.probabilities,outcome:outcome(rows.get(p.fixtureId))})),'probabilities');
 }
-export function buildForecast(fixtures,now=new Date()){
+export function buildForecast(fixtures,now=new Date(),competitionCode='bra.1'){
+  const league=leagueFor(competitionCode);
   const createdAt=now.toISOString(),cutoff=createdAt.slice(0,10)+'T00:00:00.000Z';
   // Use completed prior UTC days only. Same-day outcomes never enter features or training.
-  const history=fixtures.filter(r=>r.competitionCode==='bra.1'&&r.status==='finished'&&Date.parse(r.kickoff)+6*3600000<Date.parse(cutoff)).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||a.id.localeCompare(b.id));
+  const history=fixtures.filter(r=>r.competitionCode===competitionCode&&r.status==='finished'&&Date.parse(r.kickoff)+6*3600000<Date.parse(cutoff)).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)||a.id.localeCompare(b.id));
   const state=createState(),records=[];let pending=[];
   for(let i=0;i<history.length;){
     const day=history[i].kickoff.slice(0,10),batch=[],dayStart=Date.parse(day+'T00:00:00Z');
@@ -60,16 +69,16 @@ export function buildForecast(fixtures,now=new Date()){
   for(const {r,f} of pending)observe(state,r,f.x);
   const model=metrics(records,'probabilities'),baseline=metrics(records,'baseline');
   const dataHash=createHash('sha256').update(JSON.stringify(history.map(r=>[r.id,r.kickoff,r.homeTeamId??r.home,r.awayTeamId??r.away,r.homeGoals,r.awayGoals,r.collectedAt]))).digest('hex');
-  const latestDataAt=fixtures.filter(r=>r.competitionCode==='bra.1').map(r=>r.collectedAt).filter(v=>Number.isFinite(Date.parse(v))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??null;
+  const latestDataAt=fixtures.filter(r=>r.competitionCode===competitionCode).map(r=>r.collectedAt).filter(v=>Number.isFinite(Date.parse(v))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??null;
   const dataStale=!latestDataAt||now.getTime()-Date.parse(latestDataAt)>24*3600000||Date.parse(latestDataAt)>now.getTime();
   const forecasts=[],unavailable=[];
-  for(const row of fixtures.filter(r=>r.competitionCode==='bra.1'&&r.status==='scheduled'&&r.kickoffConfirmed!==false&&Date.parse(r.kickoff)>now.getTime()&&Date.parse(r.kickoff)<=now.getTime()+7*86400000)){
+  for(const row of fixtures.filter(r=>r.competitionCode===competitionCode&&r.status==='scheduled'&&r.kickoffConfirmed!==false&&Date.parse(r.kickoff)>now.getTime()&&Date.parse(r.kickoff)<=now.getTime()+7*86400000)){
     const f=features(state,row);
-    if(dataStale){unavailable.push({fixtureId:row.id,reason:'Coleta do Brasileirão ausente ou com mais de 24 horas.'});continue;}
+    if(dataStale){unavailable.push({fixtureId:row.id,reason:'Coleta da competição ausente ou com mais de 24 horas.'});continue;}
     if(!f.sufficient){unavailable.push({fixtureId:row.id,reason:'Histórico insuficiente: exige 160 jogos de treino e 8 jogos anteriores por equipe.'});continue;}
-    forecasts.push({fixtureId:row.id,home:row.home,away:row.away,kickoff:row.kickoff,version:MODEL_VERSION,createdAt,trainingCutoff:cutoff,trainingMatches:history.length,dataHash,probabilities:probabilities(state.weights,f.x),evidence:f.evidence,status:'experimental'});
+    forecasts.push({fixtureId:row.id,home:row.home,away:row.away,kickoff:row.kickoff,version:league.version,competitionCode,createdAt,trainingCutoff:cutoff,trainingMatches:history.length,dataHash,probabilities:probabilities(state.weights,f.x),evidence:f.evidence,status:'experimental'});
   }
-  return {version:MODEL_VERSION,competitionCode:'bra.1',status:'experimental',createdAt,trainingCutoff:cutoff,latestDataAt,dataStale,trainingMatches:history.length,dataHash,featureNames:FEATURE_NAMES,weights:state.weights,
+  return {version:league.version,competitionCode,competition:league.name,status:'experimental',createdAt,trainingCutoff:cutoff,latestDataAt,dataStale,trainingMatches:history.length,dataHash,featureNames:FEATURE_NAMES,weights:state.weights,
     forecasts,unavailable,walkForward:{records,method:'Treino sequencial por dia UTC, sem resultados do mesmo dia ou de dias futuros; margem de 6 horas após o início antes de incorporar um resultado. Dados retrospectivos sujeitos às correções atuais da fonte; não equivale a previsões registradas no passado.',model,baseline,betterThanBaseline:model.count>=200&&model.brier<baseline.brier&&model.logLoss<baseline.logLoss},
     limitations:['Somente resultados, forma recente, mando e Elo; sem lesões, suspensões ou escalações.','Histórico recente de até 10 jogos com suavização; a amostra disponível limita a aprendizagem.','Probabilidades experimentais, sem garantia de acerto ou ganho.']};
 }
