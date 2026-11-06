@@ -42,6 +42,56 @@ function renderStandings(){
   }
   if(!$('standings').children.length)$('standings').append(text('p','Sem classificação de liga nesta seleção. Competições de copa exibem partidas e resultados, sem uma tabela única que misture fases.','empty'));
 }
+const tipKinds=[{id:'top',label:'Dicas principais'},{id:'1x2',label:'1X2',category:'Resultado'},{id:'btts',label:'Ambas marcam',category:'Ambas marcam'},{id:'goals',label:'Total de gols',category:'Gols'},{id:'corners',label:'Escanteios',category:'Escanteios'},{id:'fouls',label:'Faltas',category:'Faltas'}];
+let tipKind='top';
+const advDefault=()=>({days:'day',leagues:new Set(['bra.1','eng.1','esp.1','bl1']),pmin:0,pmax:100,goals:0});
+let adv=advDefault();
+const advActive=()=>(adv.days!=='day')+(adv.leagues.size!==4)+(adv.pmin>0||adv.pmax<100)+(adv.goals>0);
+const goalSum=f=>{const a=f.evidence?.home?.lastTen?.goalsFor,b=f.evidence?.away?.lastTen?.goalsFor;return Number.isFinite(a)&&Number.isFinite(b)?a+b:null;};
+function syncAdvForm(){
+  $('adv-days').value=adv.days;$('adv-pmin').value=adv.pmin;$('adv-pmax').value=adv.pmax;$('adv-goals').value=adv.goals;
+  $('adv-pmin-out').textContent=adv.pmin+'%';$('adv-pmax-out').textContent=adv.pmax+'%';$('adv-goals-out').textContent=adv.goals.toFixed(1).replace('.',',');
+  for(const box of $('adv-leagues').querySelectorAll('input'))box.checked=adv.leagues.has(box.value);
+}
+function buildAdvForm(){
+  const wrap=$('adv-leagues');wrap.replaceChildren();
+  for(const l of pilotLeagues){const label=text('label','','check'),box=document.createElement('input');box.type='checkbox';box.value=l.code;box.addEventListener('change',()=>{box.checked?adv.leagues.add(l.code):adv.leagues.delete(l.code);renderTips();});label.append(box,text('span',' '+l.name));wrap.append(label);}
+  $('adv-days').addEventListener('change',()=>{adv.days=$('adv-days').value;renderTips();});
+  for(const [id,key,scale] of [['adv-pmin','pmin',1],['adv-pmax','pmax',1],['adv-goals','goals',1]])$(id).addEventListener('input',()=>{adv[key]=Number($(id).value);if(adv.pmin>adv.pmax){if(key==='pmin')adv.pmax=adv.pmin;else adv.pmin=adv.pmax;}syncAdvForm();renderTips();});
+  $('adv-reset').addEventListener('click',()=>{adv=advDefault();syncAdvForm();renderTips();});
+  $('adv-apply').addEventListener('click',()=>$('filter-dialog').close());
+  $('filter-close').addEventListener('click',()=>$('filter-dialog').close());
+  $('filter-dialog').addEventListener('click',event=>{if(event.target===$('filter-dialog'))$('filter-dialog').close();});
+  $('open-filter').addEventListener('click',()=>{syncAdvForm();$('filter-dialog').showModal();});
+}
+
+function renderTips(){
+  const chips=$('tip-chips');chips.replaceChildren();
+  for(const kind of tipKinds){const button=text('button',kind.label,'chip');button.type='button';button.setAttribute('aria-pressed',String(kind.id===tipKind));button.addEventListener('click',()=>{tipKind=kind.id;renderTips();});chips.append(button);}
+  const board=$('tip-board');board.replaceChildren();
+  const kind=tipKinds.find(k=>k.id===tipKind),groups=new Map();
+  const count=advActive(),badge=$('filter-count');badge.hidden=!count;badge.textContent=String(count);
+  const query=$('search').value.trim().toLocaleLowerCase('pt-BR');
+  const source=adv.days==='week'?rows.filter(r=>r.status==='scheduled'&&day(r.kickoff)>=today()&&day(r.kickoff)<=offsetDay(7)&&(r.home+' '+r.away).toLocaleLowerCase('pt-BR').includes(query)).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)):selected;
+  for(const r of source){
+    const f=r.status==='scheduled'&&oddsByMatch.get(matchKey(r));if(!f||!adv.leagues.has(r.competitionCode))continue;
+    const sum=goalSum(f);if(adv.goals>0&&(sum===null||sum<adv.goals))continue;
+    const all=scenarios(f,5),pick=kind.category?all.find(s=>s.category===kind.category):all.find(s=>['Resultado','Gols','Ambas marcam'].includes(s.category));
+    if(!pick||100*pick.probability<adv.pmin||100*pick.probability>adv.pmax+0.999)continue;
+    if(!groups.has(r.competition))groups.set(r.competition,[]);groups.get(r.competition).push({r,pick});
+  }
+  for(const [name,items] of groups){
+    const card=text('section','','league-card'),head=text('div','','league-head');head.append(text('h3',name));card.append(head);
+    for(const {r,pick} of items){
+      const row=text('article','','tip-row'),when=text('div','','match-time');when.append(text('strong',r.kickoffConfirmed===false?'A conf.':timeOnly(r.kickoff)));if(adv.days==='week')when.append(text('small',new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',timeZone:'America/Sao_Paulo'}).format(new Date(r.kickoff))));
+      const teams=text('div','','match-teams');teams.append(teamLine('p',r.homeLogo,r.home),teamLine('p',r.awayLogo,r.away));
+      const label=text('div','','tip-pick');label.append(text('small',pick.category),text('strong',pick.label));
+      row.append(when,teams,label,text('div',pick.text,'tip-prob'));card.append(row);
+    }
+    board.append(card);
+  }
+  if(!groups.size)board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite com esses filtros. Afrouxe o filtro avançado, escolha outra data na faixa acima ou mude o tipo de palpite; as previsões cobrem os próximos 7 dias das quatro ligas do piloto.','empty'));
+}
 const pilotLeagues=[{code:'bra.1',name:'Brasileirão Série A'},{code:'eng.1',name:'Premier League'},{code:'esp.1',name:'La Liga'},{code:'bl1',name:'Bundesliga'}];
 function fold(label,className){const details=text('details','',className),summary=text('summary',label);details.append(summary);return {details,summary};}
 function scenarioList(forecast){
@@ -157,7 +207,7 @@ function render(){
   }
   if(!selected.length)$('fixtures').append(text('p','Nenhuma partida neste período. Selecione “Todas as datas” ou outro campeonato.','empty'));
   $('more').hidden=visible>=selected.length;$('export').disabled=!selected.length;
-  const scores=evaluate(selected);$('scores').replaceChildren();metric($('scores'),'Previsões avaliadas',scores.count);metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');renderStandings();
+  const scores=evaluate(selected);$('scores').replaceChildren();metric($('scores'),'Previsões avaliadas',scores.count);metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');renderStandings();renderTips();
 }
 function renderDayBar(){
   const bar=$('daybar');bar.replaceChildren();
@@ -243,6 +293,7 @@ async function load(){
  }catch{predictionGeneration++;for(const request of predictionRequests)request.abort();predictionRequests.clear(); $('notice').textContent='Sem conexão com os dados. Os resultados não estão disponíveis offline.';$('mode').textContent='● SEM CONEXÃO';rows=[];selected=[];$('metrics').replaceChildren();$('scores').replaceChildren();$('standings').replaceChildren();$('predictions').replaceChildren();$('model-notice').textContent='Probabilidades indisponíveis sem conexão.';$('fixtures').textContent='Não foi possível carregar as partidas. Toque em Atualizar para tentar novamente.';$('export').disabled=true;$('more').hidden=true;}
  finally{$('refresh').disabled=false;}
 }
+buildAdvForm();
 $('refresh').addEventListener('click',load);
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installation=event;$('install').hidden=false;});
 $('install').addEventListener('click',async()=>{if(installation){await installation.prompt();await installation.userChoice;installation=null;$('install').hidden=true;}});
