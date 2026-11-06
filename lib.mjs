@@ -32,24 +32,31 @@ export function evaluate(rows) {
 
 // Most probable scenarios according to the experimental models. Not a recommendation: no odds, no value.
 const flip = label => label.startsWith('Mais de ') ? 'Menos de ' + label.slice(8) : 'Ambas as equipes marcam' === label ? 'Pelo menos uma equipe não marca' : 'Não: ' + label;
-export function scenarios(forecast, limit = 3) {
+export function scenarios(forecast, limit = 5) {
   const {home, away, probabilities: p, evidence: ev} = forecast;
-  const pct = x => (100 * x).toFixed(0) + '%';
-  const best = [];
-  const outcomes = [
-    {label: 'Vitória do ' + home, probability: p[0], explanation: `${home} faz ${ev.home.venueLastTen.points.toFixed(2)} pontos/jogo em casa nos últimos 10 jogos suavizados; ${away} faz ${ev.away.venueLastTen.points.toFixed(2)} fora.`},
-    {label: 'Empate', probability: p[1], explanation: `Forma recente próxima: ${home} com ${ev.home.lastTen.points.toFixed(2)} e ${away} com ${ev.away.lastTen.points.toFixed(2)} pontos/jogo.`},
-    {label: 'Vitória do ' + away, probability: p[2], explanation: `${away} faz ${ev.away.venueLastTen.points.toFixed(2)} pontos/jogo fora nos últimos 10 jogos suavizados; ${home} faz ${ev.home.venueLastTen.points.toFixed(2)} em casa.`}
-  ].sort((a, b) => b.probability - a.probability)[0];
-  best.push({category: 'Resultado', ...outcomes});
-  for (const market of forecast.extraMarkets ?? []) {
-    if (market.status === 'unavailable' || !market.markets?.length) continue;
-    const picks = market.markets.map(m => m.probability >= m.oppositeProbability ? {label: m.label, probability: m.probability} : {label: flip(m.label), probability: m.oppositeProbability});
-    const top = picks.sort((a, b) => b.probability - a.probability)[0];
-    const explanation = market.code === 'goals'
-      ? `Média recente de gols marcados por jogo: ${home} ${ev.home.lastTen.goalsFor.toFixed(1)} e ${away} ${ev.away.lastTen.goalsFor.toFixed(1)}; sofridos: ${ev.home.lastTen.goalsAgainst.toFixed(1)} e ${ev.away.lastTen.goalsAgainst.toFixed(1)}.`
-      : `Estimativa de ${market.name.toLowerCase()} a partir do histórico recente das duas equipes (modelo treinado com ${market.trainingMatches} jogos da liga).`;
-    best.push({category: market.name, ...top, explanation});
+  const valid=x=>Number.isFinite(x)&&x>=0&&x<=1;
+  const pct=x=>x>=.995?'>99%':(100*x).toFixed(0)+'%';
+  const fixed=(value,digits=2)=>Number.isFinite(value)?value.toFixed(digits):'—';
+  const best=[];
+  if(Array.isArray(p)&&p.length===3&&p.every(valid)&&Math.abs(p.reduce((a,b)=>a+b,0)-1)<1e-8){
+    const i=p.indexOf(Math.max(...p));
+    best.push({category:'Resultado',label:i===0?'Vitória do '+home:i===1?'Empate':'Vitória do '+away,probability:p[i],explanation:`Forma recente: ${home} ${fixed(ev?.home?.lastTen?.points)} e ${away} ${fixed(ev?.away?.lastTen?.points)} pontos/jogo; o modelo também considera o mando.`});
   }
-  return best.sort((a, b) => b.probability - a.probability).slice(0, limit).map(s => ({...s, text: pct(s.probability)}));
+  for(const market of forecast.extraMarkets??[]){
+    if(market.status!=='experimental'||!['goals','corners','fouls'].includes(market.code))continue;
+    const families=new Map();
+    for(const m of market.markets??[]){
+      if(!valid(m.probability)||!valid(m.oppositeProbability)||Math.abs(m.probability+m.oppositeProbability-1)>1e-8)continue;
+      const both=market.code==='goals'&&(m.both||m.id==='both-teams-score'||m.label==='Ambas as equipes marcam');
+      const category=both?'Ambas marcam':market.name;
+      const pick=m.probability>=m.oppositeProbability?{label:m.label,probability:m.probability}:{label:flip(m.label),probability:m.oppositeProbability};
+      const previous=families.get(category);if(!previous||pick.probability>previous.probability)families.set(category,pick);
+    }
+    for(const [category,pick] of families){
+      const explanation=market.code==='goals'?`Gols marcados por jogo: ${home} ${fixed(ev?.home?.lastTen?.goalsFor,1)}; ${away} ${fixed(ev?.away?.lastTen?.goalsFor,1)}.`:`Histórico recente das equipes; ${market.trainingMatches} jogos no treino da liga.`;
+      best.push({category,...pick,explanation});
+    }
+  }
+  const count=Number.isInteger(limit)?Math.max(0,Math.min(5,limit)):5;
+  return best.sort((a,b)=>b.probability-a.probability).slice(0,count).map(s=>({...s,text:pct(s.probability)}));
 }

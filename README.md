@@ -125,3 +125,7 @@ A integração ESPN preserva `homeFouls`, `awayFouls` e o total a partir de `fou
 Modelos binários estimam totais acima de 24,5, 29,5 e 34,5 faltas. O histórico e os parâmetros são separados por liga e por mercado. Há os mesmos limites mínimos, suavização, corte temporal, ordenação dos totais e avaliações independentes das etapas anteriores. A Bundesliga permanece indisponível para escanteios e faltas. Não se inferem essas estatísticas a partir de gols.
 
 Após as três etapas, o benchmark local em 06/11/2026 teve mediana de 73,82 ms para calcular as quatro ligas, RSS de 279,22 MB após os cálculos e pico de 338,82 MB incluindo inicialização/migração. É medição local, não pico de produção nem teste de carga concorrente. Cada etapa foi publicada e verificada antes da seguinte, mantendo o plano gratuito.
+
+## Resumo com até cinco cenários
+
+O resumo por partida, também acessível pelo botão flutuante, mostra até cinco estimativas em ordem decrescente: resultado mais provável, um total de gols, ambas marcam, um total de escanteios e um total de faltas. Limites aninhados de uma mesma família não se repetem; os lados opostos não aparecem juntos. São exibidas menos opções quando os dados não estão disponíveis. Não se multiplicam probabilidades correlacionadas e não há comparação com odds ou promessa de acerto. O resumo reutiliza os cálculos publicados, sem novo modelo ou serviço.

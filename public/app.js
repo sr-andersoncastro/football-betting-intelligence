@@ -38,6 +38,16 @@ function renderStandings(){
 }
 const pilotLeagues=[{code:'bra.1',name:'Brasileirão Série A'},{code:'eng.1',name:'Premier League'},{code:'esp.1',name:'La Liga'},{code:'bl1',name:'Bundesliga'}];
 function fold(label,className){const details=text('details','',className),summary=text('summary',label);details.append(summary);return {details,summary};}
+function scenarioList(forecast){
+  const list=text('ol','','scenario-list');
+  for(const sc of scenarios(forecast,5)){
+    const item=text('li',''),top=text('div','','scenario-top');
+    top.append(text('span',sc.category,'scenario-cat'),text('strong',sc.label),text('b',sc.text));
+    const bar=text('div','','scenario-bar'),fill=text('i','');fill.style.width=(100*sc.probability).toFixed(2)+'%';bar.append(fill);
+    item.append(top,bar,text('p',sc.explanation));list.append(item);
+  }
+  return list;
+}
 function renderLeagueReport(report,body){
   body.replaceChildren();
   body.append(text('p',`${report.trainingMatches} partidas no treino · Coleta: ${report.latestDataAt?date(report.latestDataAt):'indisponível'}${report.dataStale?' · coleta defasada: previsões suspensas':''}.`,'muted'));
@@ -49,6 +59,7 @@ function renderLeagueReport(report,body){
     for(const f of matches){
       const time=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}).format(new Date(f.kickoff));
       const match=fold(time+' · '+f.home+' × '+f.away,'prediction-match');
+      const overview=fold('Cenários mais prováveis segundo o modelo','scenarios');overview.details.append(scenarioList(f),text('p','Até cinco cenários individuais, um por tipo de mercado. Estimativas experimentais; não são uma aposta combinada nem comparação de odds.','muted'));match.details.append(overview.details);
       const chances=text('div','','probability-grid');
       [f.home,'Empate',f.away].forEach((label,i)=>{const cell=text('div','','probability-cell');cell.append(text('span',label),text('strong',(100*f.probabilities[i]).toFixed(1)+'%'));chances.append(cell);});
       match.details.append(chances);
@@ -132,9 +143,7 @@ function render(){
       for(let i=0;i<3;i++)chances.append(text('span',p&&r.status==='scheduled'?Math.round(100*p[i])+'%':'—'));
       row.append(when,teams,chances);
       if(forecast&&r.status==='scheduled'){
-        const box=text('details','','scenarios'),list=text('ol','','scenario-list');box.append(text('summary','Cenários mais prováveis segundo o modelo'));
-        for(const sc of scenarios(forecast)){const item=text('li','');const top=text('div','','scenario-top');top.append(text('span',sc.category,'scenario-cat'),text('strong',sc.label),text('b',sc.text));const bar=text('div','','scenario-bar'),fill=text('i','');fill.style.width=sc.text;bar.append(fill);item.append(top,bar,text('p',sc.explanation));list.append(item);}
-        box.append(list,text('p','Estimativas de modelos experimentais, sem garantia de acerto. Não são recomendação de aposta nem comparam odds.','muted'));row.append(box);
+        const box=text('details','','scenarios');box.append(text('summary','Cenários mais prováveis segundo o modelo'),scenarioList(forecast),text('p','Até cinco cenários individuais, um por tipo. Estimativas experimentais, sem garantia de acerto; não são aposta combinada nem comparação de odds.','muted'));row.append(box);
       }
       card.append(row);
     }
@@ -172,14 +181,13 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')drawer(false
 function openScenarios(){
   const body=$('scenario-body');body.replaceChildren();
   const games=selected.filter(r=>r.status==='scheduled'&&oddsByMatch.has(matchKey(r)));
-  $('scenario-sub').textContent=games.length?games.length+' jogo(s) da seleção atual, com horário de Brasília. Mude a data ou os filtros para ver outros jogos.':'';
+  $('scenario-sub').textContent=games.length?games.length+' jogo(s) da seleção atual. Até cinco cenários individuais por jogo, conforme os dados disponíveis. Horários de Brasília.':'';
   for(const r of games){
     const f=oddsByMatch.get(matchKey(r)),card=text('section','','scenario-game');
     card.append(text('h3',timeOnly(r.kickoff)+' · '+r.home+' × '+r.away),text('p',r.competition,'muted'));
     const chips=text('div','','scenario-chips');
     [['Vitória '+r.home,0],['Empate',1],['Vitória '+r.away,2]].forEach(([label,i])=>{const chip=text('div','','scenario-chip');chip.append(text('span',label),text('strong',Math.round(100*f.probabilities[i])+'%'));chips.append(chip);});
-    const list=text('ol','','scenario-list');
-    for(const sc of scenarios(f,4)){const item=text('li','');const top=text('div','','scenario-top');top.append(text('span',sc.category,'scenario-cat'),text('strong',sc.label),text('b',sc.text));const bar=text('div','','scenario-bar'),fill=text('i','');fill.style.width=sc.text;bar.append(fill);item.append(top,bar,text('p',sc.explanation));list.append(item);}
+    const list=scenarioList(f);
     card.append(chips,list);body.append(card);
   }
   if(!games.length)body.append(text('p','Nenhum jogo agendado com probabilidades nesta seleção. As previsões existem para Brasileirão Série A, Premier League, La Liga e Bundesliga, nos próximos 7 dias.','empty'));
