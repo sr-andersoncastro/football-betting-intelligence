@@ -79,3 +79,14 @@ aside{background:linear-gradient(180deg,#171539,#0f0e27);border-right:1px solid 
 .market-line strong{color:var(--amber)}.result{color:var(--amber)}td:nth-child(3){color:var(--amber)}tbody tr:hover{background:#ffffff0d}
 #coverage a{color:#cbbfff}
 @media(prefers-reduced-motion:reduce){.league-card,.daybar button,button{transition:none}}
+
+/* Botão flutuante com ações rápidas */
+.fab{position:fixed;right:18px;bottom:84px;z-index:26;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.fab-main{width:60px;height:60px;border-radius:50%;padding:0;font-size:26px;color:#fff;background:radial-gradient(circle at 30% 25%,#ff8fb6,#ff4d8d 45%,#7c5cff);box-shadow:0 2px 0 #ffffff66 inset,0 -4px 8px #0004 inset,0 16px 28px -6px #ff4d8dcc,0 6px 12px #0008;animation:fab-float 3.2s ease-in-out infinite;transition:transform .2s}
+.fab-main:hover{background:radial-gradient(circle at 30% 25%,#ffa3c4,#ff5f9a 45%,#8d70ff);transform:scale(1.07)}.fab.open .fab-main{animation:none;transform:rotate(135deg)}
+.fab-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.fab-actions button{display:flex;align-items:center;gap:10px;border-radius:30px;padding:10px 16px;font-size:14px;font-weight:600;animation:fab-in .18s ease-out both}
+.fab-actions button:nth-child(2){animation-delay:.04s}.fab-actions button:nth-child(1){animation-delay:.08s}
+@keyframes fab-float{50%{transform:translateY(-5px)}}@keyframes fab-in{from{opacity:0;transform:translateY(10px) scale(.9)}}
+@media(min-width:901px){.fab{bottom:28px;right:28px}}
+@media(prefers-reduced-motion:reduce){.fab-main,.fab-actions button{animation:none}}

@@ -163,6 +163,16 @@ $('menu').addEventListener('click',()=>drawer(!$('drawer').classList.contains('o
 $('scrim').addEventListener('click',()=>drawer(false));
 $('drawer').addEventListener('click',event=>{if(event.target.closest('a'))drawer(false);});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')drawer(false);});
+const fab=open=>{$('fab-actions').hidden=!open;$('fab-main').setAttribute('aria-expanded',String(open));$('fab').classList.toggle('open',open);};
+$('fab-main').addEventListener('click',()=>fab($('fab-actions').hidden));
+$('fab-actions').addEventListener('click',event=>{
+  const act=event.target.closest('button')?.dataset.act;if(!act)return;
+  if(act==='top')window.scrollTo({top:0,behavior:'smooth'});
+  else if(act==='refresh')$('refresh').click();
+  else if(act==='export'&&!$('export').disabled)$('export').click();
+  fab(false);
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')fab(false);});
 const syncTabs=()=>{for(const link of document.querySelectorAll('.tabbar a'))link.classList.toggle('active',link.getAttribute('href')===(location.hash||'#matches'));};
 window.addEventListener('hashchange',syncTabs);syncTabs();
 $('competition').addEventListener('input',()=>{seasons();visible=50;render();});
