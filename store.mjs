@@ -15,6 +15,9 @@ export class Store {
     if(!this.db.prepare('PRAGMA table_info(fixtures)').all().some(c=>c.name==='scope')) {
       this.db.exec("ALTER TABLE fixtures ADD COLUMN scope TEXT NOT NULL DEFAULT ''; UPDATE fixtures SET scope='openliga:bl1:' || season;");
     }
+    // Keep audit metadata queries off the large raw response pages.
+    this.db.exec(`CREATE INDEX IF NOT EXISTS captures_scope_time ON captures(scope,julianday(collected_at) DESC,id DESC,source,season,collected_at);
+      CREATE INDEX IF NOT EXISTS captures_recent ON captures(julianday(collected_at) DESC,id DESC,source,url,season,scope,collected_at,sha256);`);
   }
   ingest(capture) {
     if(createHash('sha256').update(capture.raw).digest('hex')!==capture.sha256)throw new Error('Integridade da captura inválida');

@@ -57,8 +57,8 @@ export const server = http.createServer(async (req,res)=>{
   if(url.pathname === '/api/v1/fixtures') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',fixtures:getFixtures()});
   if(url.pathname === '/api/v1/standings') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',groups:standings(getFixtures()),rules:'3 pontos por vitória; desempate por saldo, gols marcados e nome. Sem ajustes disciplinares ou critérios oficiais adicionais.'});
   if(url.pathname === '/api/v1/data-status') {
-    const captures=store.captures(),latest=captures[0]?.collectedAt??null;
-    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB + ESPN',latestCollectedAt:latest,stale:coverageStatus().some(c=>c.stale),coverage:coverageStatus(),captures,logs:store.logs(),unavailable:['corners','cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
+    const captures=store.captures(),latest=captures[0]?.collectedAt??null,coverage=coverageStatus();
+    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB + ESPN',latestCollectedAt:latest,stale:coverage.some(c=>c.stale),coverage,captures,logs:store.logs(),unavailable:['corners','cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
   }
   if(url.pathname === '/api/v1/evaluation') return json({...evaluate(getFixtures()),source:demo?'synthetic':'OpenLigaDB + ESPN',brierConvention:'multiclass sum, range 0–2'});
   const asset = assets.get(url.pathname);
