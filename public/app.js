@@ -1,4 +1,4 @@
-import {evaluate} from '/lib.mjs';
+import {evaluate,scenarios} from '/lib.mjs';
 import {standings} from '/analytics.mjs';
 const $=id=>document.getElementById(id);
 let rows=[],selected=[],mode='real',visible=50,installation,selectedDay=null,oddsByMatch=new Map();
@@ -128,9 +128,15 @@ function render(){
       teams.append(h,a);
       const meta=[r.venue,r.source&&r.source+' · coleta '+date(r.collectedAt)].filter(Boolean).join(' · ');
       if(meta)teams.append(text('small',meta,'match-meta'));
-      const chances=text('div','','match-odds'),p=oddsByMatch.get(matchKey(r))??r.prediction?.probabilities;
+      const chances=text('div','','match-odds'),forecast=oddsByMatch.get(matchKey(r)),p=forecast?.probabilities??r.prediction?.probabilities;
       for(let i=0;i<3;i++)chances.append(text('span',p&&r.status==='scheduled'?Math.round(100*p[i])+'%':'—'));
-      row.append(when,teams,chances);card.append(row);
+      row.append(when,teams,chances);
+      if(forecast&&r.status==='scheduled'){
+        const box=text('details','','scenarios'),list=text('ol','','scenario-list');box.append(text('summary','Cenários mais prováveis segundo o modelo'));
+        for(const sc of scenarios(forecast)){const item=text('li','');const top=text('div','','scenario-top');top.append(text('span',sc.category,'scenario-cat'),text('strong',sc.label),text('b',sc.text));const bar=text('div','','scenario-bar'),fill=text('i','');fill.style.width=sc.text;bar.append(fill);item.append(top,bar,text('p',sc.explanation));list.append(item);}
+        box.append(list,text('p','Estimativas de modelos experimentais, sem garantia de acerto. Não são recomendação de aposta nem comparam odds.','muted'));row.append(box);
+      }
+      card.append(row);
     }
     $('fixtures').append(card);
   }
@@ -155,7 +161,7 @@ async function loadOdds(){
   if(mode==='demo')return;
   const results=await Promise.allSettled(pilotLeagues.map(l=>fetch('/api/v1/predictions?competition='+encodeURIComponent(l.code)).then(r=>r.ok?r.json():null)));
   oddsByMatch=new Map();
-  for(const result of results)for(const f of result.value?.forecasts??[])oddsByMatch.set(matchKey(f),f.probabilities);
+  for(const result of results)for(const f of result.value?.forecasts??[])oddsByMatch.set(matchKey(f),f);
   render();
 }
 const drawer=open=>{$('drawer').classList.toggle('open',open);$('scrim').hidden=!open;$('menu').setAttribute('aria-expanded',String(open));};
