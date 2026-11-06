@@ -30,7 +30,7 @@ test('servidor entrega painel, dados e erros seguros',async()=>{
   assert.equal((await fetch(base+'/api/v1/predictions?competition=bra.2')).status,400);
   const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='bra.1' && c.status==='available'));
   const manifest=await fetch(base+'/manifest.webmanifest').then(r=>r.json());assert.equal(manifest.display,'standalone');assert.equal(manifest.icons.length,2);
-  assert.equal(audit.coverage.length,11);assert.ok(payload.fixtures.some(r=>r.competitionCode==='bra.2'));
+  assert.equal(audit.coverage.length,14);assert.ok(payload.fixtures.some(r=>r.competitionCode==='bra.2'));
   assert.equal((await fetch(base+'/.env')).status,404);
   assert.equal((await fetch(base+'/api/v1/fixtures',{method:'POST'})).status,405);
  }finally{await new Promise(resolve=>server.close(resolve));store.close();}

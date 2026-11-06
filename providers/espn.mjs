@@ -10,8 +10,11 @@ export const leagues = [
   {code:'fra.1',name:'Ligue 1'},
   {code:'por.1',name:'Liga Portugal'},
   {code:'ned.1',name:'Eredivisie'},
+  {code:'eng.2',name:'EFL Championship'},
   {code:'uefa.champions',name:'Champions League',cup:true},
-  {code:'conmebol.libertadores',name:'Copa Libertadores',calendar:true,cup:true}
+  {code:'uefa.europa',name:'Europa League',cup:true},
+  {code:'conmebol.libertadores',name:'Copa Libertadores',calendar:true,cup:true},
+  {code:'conmebol.sudamericana',name:'Copa Sudamericana',calendar:true,cup:true}
 ];
 function statistic(team,name,finished){
   if(!finished||!Array.isArray(team.statistics))return null;

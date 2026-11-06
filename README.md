@@ -21,7 +21,8 @@ Abra http://localhost:3000. `npm test` executa a suíte. `npm run sync` consulta
 | Brasileirão Série A e Série B | ESPN |
 | Premier League, La Liga, Serie A italiana, Ligue 1 | ESPN |
 | Liga Portugal, Eredivisie | ESPN |
-| Champions League e Copa Libertadores | ESPN |
+| EFL Championship | ESPN |
+| Champions League, Europa League, Copa Libertadores e Copa Sudamericana | ESPN |
 | Bundesliga | OpenLigaDB |
 
 A ESPN é acessada pelo endpoint público `https://site.api.espn.com/apis/site/v2/sports/soccer/{liga}/scoreboard?dates={ano}&limit=1000`. Não é uma API contratada nem há vínculo com a ESPN, SLA ou garantia de disponibilidade, completude ou direitos de redistribuição comercial. Antes de explorar comercialmente, validar as condições do fornecedor e substituir por um feed licenciado se necessário. OpenLigaDB é uma base comunitária: https://www.openligadb.de/ e https://api.openligadb.de/index.html.
@@ -29,6 +30,8 @@ A ESPN é acessada pelo endpoint público `https://site.api.espn.com/apis/site/v
 O sincronizador consulta o ano civil atual e anterior na ESPN; cada evento preserva sua temporada própria. Uma temporada europeia cruza dois anos. Assim, a temporada mais antiga pode estar incompleta, e datas futuras ainda não publicadas não aparecem. Respostas com 1.000 eventos são rejeitadas como possivelmente truncadas. Bundesliga consulta a temporada atual e anterior. O painel exibe origem, data de coleta e anos consultados; não anuncia resultados como disponíveis antes da coleta bem-sucedida.
 
 Inclui partidas, equipes, datas, estado, estádio quando fornecido e placares finais. Estados ao vivo são apenas a fotografia da coleta, sem atualização contínua. Horários indefinidos aparecem como “a confirmar”. Adiamentos e cancelamentos não recebem um placar final. Escanteios e faltas são integrados quando a ESPN fornece contagens por equipe. A Bundesliga pela OpenLigaDB não fornece essas estatísticas. Cartões, xG e escalações não estão integrados; ausências permanecem sem valor.
+
+Europa League, Copa Sudamericana e EFL Championship foram adicionadas à lista de coleta, mas ainda sem captura versionada: aparecem como “pendente” em `/api/v1/data-status` até a próxima execução de `npm run sync` ou do workflow de coleta. Não estão no piloto de probabilidades.
 
 ## Site e instalação no celular
 
