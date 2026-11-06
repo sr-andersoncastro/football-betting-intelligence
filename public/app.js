@@ -42,6 +42,31 @@ function renderStandings(){
   }
   if(!$('standings').children.length)$('standings').append(text('p','Sem classificação de liga nesta seleção. Competições de copa exibem partidas e resultados, sem uma tabela única que misture fases.','empty'));
 }
+const tipKinds=[{id:'top',label:'Dicas principais'},{id:'1x2',label:'1X2',category:'Resultado'},{id:'btts',label:'Ambas marcam',category:'Ambas marcam'},{id:'goals',label:'Total de gols',category:'Gols'},{id:'corners',label:'Escanteios',category:'Escanteios'},{id:'fouls',label:'Faltas',category:'Faltas'}];
+let tipKind='top';
+function renderTips(){
+  const chips=$('tip-chips');chips.replaceChildren();
+  for(const kind of tipKinds){const button=text('button',kind.label,'chip');button.type='button';button.setAttribute('aria-pressed',String(kind.id===tipKind));button.addEventListener('click',()=>{tipKind=kind.id;renderTips();});chips.append(button);}
+  const board=$('tip-board');board.replaceChildren();
+  const kind=tipKinds.find(k=>k.id===tipKind),groups=new Map();
+  for(const r of selected){
+    const f=r.status==='scheduled'&&oddsByMatch.get(matchKey(r));if(!f)continue;
+    const all=scenarios(f,5),pick=kind.category?all.find(s=>s.category===kind.category):all.find(s=>['Resultado','Gols','Ambas marcam'].includes(s.category));
+    if(!pick)continue;
+    if(!groups.has(r.competition))groups.set(r.competition,[]);groups.get(r.competition).push({r,pick});
+  }
+  for(const [name,items] of groups){
+    const card=text('section','','league-card'),head=text('div','','league-head');head.append(text('h3',name));card.append(head);
+    for(const {r,pick} of items){
+      const row=text('article','','tip-row'),when=text('div','','match-time');when.append(text('strong',r.kickoffConfirmed===false?'A conf.':timeOnly(r.kickoff)));
+      const teams=text('div','','match-teams');teams.append(teamLine('p',r.homeLogo,r.home),teamLine('p',r.awayLogo,r.away));
+      const label=text('div','','tip-pick');label.append(text('small',pick.category),text('strong',pick.label));
+      row.append(when,teams,label,text('div',pick.text,'tip-prob'));card.append(row);
+    }
+    board.append(card);
+  }
+  if(!groups.size)board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite deste tipo para a seleção atual. Escolha outra data na faixa acima; as previsões cobrem os próximos 7 dias das quatro ligas do piloto.','empty'));
+}
 const pilotLeagues=[{code:'bra.1',name:'Brasileirão Série A'},{code:'eng.1',name:'Premier League'},{code:'esp.1',name:'La Liga'},{code:'bl1',name:'Bundesliga'}];
 function fold(label,className){const details=text('details','',className),summary=text('summary',label);details.append(summary);return {details,summary};}
 function scenarioList(forecast){
@@ -157,7 +182,7 @@ function render(){
   }
   if(!selected.length)$('fixtures').append(text('p','Nenhuma partida neste período. Selecione “Todas as datas” ou outro campeonato.','empty'));
   $('more').hidden=visible>=selected.length;$('export').disabled=!selected.length;
-  const scores=evaluate(selected);$('scores').replaceChildren();metric($('scores'),'Previsões avaliadas',scores.count);metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');renderStandings();
+  const scores=evaluate(selected);$('scores').replaceChildren();metric($('scores'),'Previsões avaliadas',scores.count);metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');renderStandings();renderTips();
 }
 function renderDayBar(){
   const bar=$('daybar');bar.replaceChildren();
