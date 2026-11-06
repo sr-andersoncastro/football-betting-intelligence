@@ -37,3 +37,4 @@ export async function collect(season, fetcher=fetch, now=new Date()) {
   const collectedAt=now.toISOString();
   return {source:'OpenLigaDB',url,season,collectedAt,sha256:createHash('sha256').update(raw).digest('hex'),fixtures:normalize(JSON.parse(raw),season,collectedAt),raw};
 }
+

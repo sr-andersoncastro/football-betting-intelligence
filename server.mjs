@@ -4,38 +4,63 @@ import { join } from 'node:path';
 import {gunzipSync} from 'node:zlib';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateFixtures, evaluate } from './lib.mjs';
+import { standings } from './analytics.mjs';
 import {Store} from './store.mjs';
-import {collect,coverage} from './providers/openliga.mjs';
+import {collect} from './providers/openliga.mjs';
+import {collect as collectESPN,leagues} from './providers/espn.mjs';
 const root = new URL('./', import.meta.url);
 const demo=process.env.DATA_MODE==='demo';
 const dataDirectory=process.env.DATA_DIR || fileURLToPath(new URL('runtime/',root));
 if(!demo)await mkdir(dataDirectory,{recursive:true});
 export const store=new Store(demo?':memory:':join(dataDirectory,'football.sqlite'));
 if(!demo){
-  const seed=JSON.parse(await readFile(new URL('data/openliga.json',root),'utf8'));
-  for(const capture of seed.captures)store.ingest({...capture,raw:gunzipSync(Buffer.from(capture.rawGzip,'base64')).toString('utf8')});
+  for(const file of ['data/openliga.json','data/espn.json']) {
+    try {
+      const seed=JSON.parse(await readFile(new URL(file,root),'utf8'));
+      for(const capture of seed.captures)store.ingest({...capture,raw:gunzipSync(Buffer.from(capture.rawGzip,'base64')).toString('utf8')});
+    }catch(error){store.log('error',file+': '+error.message);}
+  }
 }
 const demoFixtures=demo?validateFixtures(JSON.parse(await readFile(new URL('data/demo.json',root),'utf8'))):[];
 const getFixtures=()=>demo?demoFixtures:store.fixtures();
+let syncing=false;
 export async function sync(){
-  const current=new Date().getUTCMonth()>=6?new Date().getUTCFullYear():new Date().getUTCFullYear()-1;
-  try{const capture=await collect(current);store.ingest(capture);store.log('success',`${capture.fixtures.length} partidas de ${current} coletadas`);}catch(error){store.log('error',error.message);}
+  if(syncing)return;
+  syncing=true;
+  try{
+    const now=new Date(),year=now.getUTCFullYear();
+    const current=now.getUTCMonth()>=6?year:year-1;
+    const jobs=[['Bundesliga',()=>collect(current)],...leagues.flatMap(l=>[year-1,year].map(y=>[l.name+' '+y,()=>collectESPN(l.code,y)]))];
+    for(const [label,job] of jobs){
+      try{const capture=await job();store.ingest(capture);store.log('success',`${label}: ${capture.fixtures.length} partidas coletadas`);}
+      catch(error){store.log('error',label+': '+error.message);}
+    }
+  }finally{syncing=false;}
 }
-const assets = new Map([['/', ['public/index.html','text/html; charset=utf-8']],['/lib.mjs',['lib.mjs','text/javascript; charset=utf-8']],['/app.js',['public/app.js','text/javascript; charset=utf-8']],['/style.css',['public/style.css','text/css; charset=utf-8']]]);
+function coverageStatus(){
+  const captures=store.coverage();
+  return [{code:'bl1',name:'Bundesliga',source:'OpenLigaDB'},...leagues.map(l=>({...l,source:'ESPN'}))].map(league=>{
+    const matching=captures.filter(c=>c.scope.startsWith(league.source==='ESPN'?`espn:${league.code}:`:'openliga:bl1:'));
+    const latest=matching.map(c=>c.collectedAt).sort((a,b)=>Date.parse(b)-Date.parse(a))[0]??null;
+    return {...league,status:latest?'available':'pending',latestCollectedAt:latest,stale:!latest || Date.now()-Date.parse(latest)>24*3600000,calendarYears:matching.map(c=>c.season).sort()};
+  });
+}
+const assets = new Map([['/manifest.webmanifest',['public/manifest.webmanifest','application/manifest+json']],['/sw.js',['public/sw.js','text/javascript; charset=utf-8']],['/icon-192.png',['public/icon-192.png','image/png']],['/icon-512.png',['public/icon-512.png','image/png']],['/', ['public/index.html','text/html; charset=utf-8']],['/analytics.mjs',['analytics.mjs','text/javascript; charset=utf-8']],['/lib.mjs',['lib.mjs','text/javascript; charset=utf-8']],['/app.js',['public/app.js','text/javascript; charset=utf-8']],['/style.css',['public/style.css','text/css; charset=utf-8']]]);
 export const server = http.createServer(async (req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'");
+  res.setHeader('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; worker-src 'self'; manifest-src 'self'");
   res.setHeader('Cache-Control','no-store');
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');
   const json = value => {res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value));};
-  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.2.0'});
-  if(url.pathname === '/api/v1/fixtures') return json({source:demo?'synthetic':'OpenLigaDB',fixtures:getFixtures()});
+  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.3.0'});
+  if(url.pathname === '/api/v1/fixtures') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',fixtures:getFixtures()});
+  if(url.pathname === '/api/v1/standings') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',groups:standings(getFixtures()),rules:'3 pontos por vitória; desempate por saldo, gols marcados e nome. Sem ajustes disciplinares ou critérios oficiais adicionais.'});
   if(url.pathname === '/api/v1/data-status') {
     const captures=store.captures(),latest=captures[0]?.collectedAt??null;
-    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB',latestCollectedAt:latest,stale:latest?Date.now()-Date.parse(latest)>24*3600000:true,coverage,captures,logs:store.logs(),unavailable:['corners','cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
+    return json({mode:demo?'demo':'real',source:demo?'synthetic':'OpenLigaDB + ESPN',latestCollectedAt:latest,stale:coverageStatus().some(c=>c.stale),coverage:coverageStatus(),captures,logs:store.logs(),unavailable:['corners','cards','xG','lineups'],storage:'SQLite local; no Render gratuito, alterações locais são perdidas ao reiniciar ou publicar. A captura versionada no GitHub é preservada.'});
   }
-  if(url.pathname === '/api/v1/evaluation') return json({...evaluate(getFixtures()),source:demo?'synthetic':'OpenLigaDB',brierConvention:'multiclass sum, range 0–2'});
+  if(url.pathname === '/api/v1/evaluation') return json({...evaluate(getFixtures()),source:demo?'synthetic':'OpenLigaDB + ESPN',brierConvention:'multiclass sum, range 0–2'});
   const asset = assets.get(url.pathname);
   if(!asset){res.writeHead(404);return res.end('Não encontrado');}
   try {const data=await readFile(new URL(asset[0],root));res.writeHead(200,{'Content-Type':asset[1]});res.end(data);} catch {res.writeHead(500);res.end('Erro ao abrir o painel');}
@@ -44,3 +69,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === fileURLToPath(pathToFi
   server.listen(Number(process.env.PORT || 3000),'0.0.0.0',()=>console.log('Painel disponível na porta '+(process.env.PORT || 3000)));
   if(!demo){void sync();setInterval(()=>void sync(),6*3600000).unref();}
 }
+

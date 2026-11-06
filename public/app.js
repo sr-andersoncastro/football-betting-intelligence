@@ -1,54 +1,95 @@
-import { evaluate } from '/lib.mjs';
-const $ = id => document.getElementById(id);
-let rows = [], selected = [], mode='real', visible=50;
-const date=value=>new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(value));
-const text = (tag, value, className) => { const node=document.createElement(tag); node.textContent=value; if(className) node.className=className; return node; };
+import {evaluate} from '/lib.mjs';
+import {standings} from '/analytics.mjs';
+const $=id=>document.getElementById(id);
+let rows=[],selected=[],mode='real',visible=50,installation;
+const formatter=new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'});
+const date=value=>formatter.format(new Date(value));
+const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
+const today=()=>day(new Date());
+const offsetDay=n=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return day(d);};
+const text=(tag,value,className)=>{const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;};
+const statuses={scheduled:'Agendada',finished:'Encerrada',live:'Em andamento na coleta',postponed:'Adiada',cancelled:'Cancelada',suspended:'Suspensa'};
 function metric(parent,label,value){const card=text('div','','metric');card.append(text('span',label),text('strong',value));parent.append(card);}
+function competitionFixtures(){return rows.filter(r=>(!$('competition').value||r.competition===$('competition').value)&&(!$('season').value||String(r.season)===$('season').value));}
+function seasons(){
+  const previous=$('season').value;
+  $('season').replaceChildren(new Option('Todas as temporadas',''));
+  const matching=rows.filter(r=>!$('competition').value||r.competition===$('competition').value);
+  for(const season of [...new Set(matching.map(r=>r.season).filter(Boolean))].sort((a,b)=>b-a)){
+    const label=$('competition').value?matching.find(r=>r.season===season).seasonLabel??`${season}/${season+1}`:String(season);
+    $('season').append(new Option(label,String(season)));
+  }
+  if([...$('season').options].some(o=>o.value===previous))$('season').value=previous;
+}
+function renderStandings(){
+  $('standings').replaceChildren();
+  for(const group of standings(competitionFixtures())){
+    const table=text('table',''),caption=text('caption',group.competition+' · '+group.seasonLabel+' · '+group.matches+' partidas encerradas');table.append(caption);
+    const head=text('thead',''),header=text('tr','');
+    for(const label of ['#','Equipe','Pts','J','V','E','D','GP','GC','SG','Aprov.']){const cell=text('th',label);cell.scope='col';header.append(cell);}
+    head.append(header);table.append(head);const body=text('tbody','');
+    group.teams.forEach((team,index)=>{const row=text('tr','');for(const value of [index+1,team.name,team.points,team.played,team.won,team.drawn,team.lost,team.goalsFor,team.goalsAgainst,team.goalDifference,team.pointsPercentage.toFixed(1)+'%'])row.append(text('td',value));body.append(row);});
+    table.append(body);const wrapper=text('div','','table-scroll');wrapper.tabIndex=0;wrapper.setAttribute('role','region');wrapper.setAttribute('aria-label',caption.textContent);wrapper.append(table);$('standings').append(wrapper);
+  }
+  if(!$('standings').children.length)$('standings').append(text('p','Sem classificação de liga nesta seleção. Competições de copa exibem partidas e resultados, sem uma tabela única que misture fases.','empty'));
+}
 function render(){
-  selected=rows.filter(r=>(!$('competition').value || r.competition===$('competition').value) && (!$('season').value || String(r.season)===$('season').value) && (!$('status').value || r.status===$('status').value) && (r.home+' '+r.away).toLocaleLowerCase('pt-BR').includes($('search').value.trim().toLocaleLowerCase('pt-BR'))).sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff));
-  const finished=selected.filter(r=>r.status==='finished');
-  $('metrics').replaceChildren();
-  metric($('metrics'),'Partidas na seleção',selected.length);
-  metric($('metrics'),'Partidas encerradas',finished.length);
+  const period=$('period').value;
+  selected=competitionFixtures().filter(r=>{
+    const d=day(r.kickoff);
+    return (!$('status').value||r.status===$('status').value)&&(r.home+' '+r.away).toLocaleLowerCase('pt-BR').includes($('search').value.trim().toLocaleLowerCase('pt-BR'))&&
+      (period==='all'||period==='today'&&d===today()||period==='next'&&d>=today()&&d<=offsetDay(7)||period==='recent'&&d>=offsetDay(-7)&&d<=today());
+  }).sort((a,b)=>period==='recent'?Date.parse(b.kickoff)-Date.parse(a.kickoff):Date.parse(a.kickoff)-Date.parse(b.kickoff));
+  const finished=selected.filter(r=>r.status==='finished');$('metrics').replaceChildren();
+  metric($('metrics'),'Partidas na seleção',selected.length);metric($('metrics'),'Partidas encerradas',finished.length);
   metric($('metrics'),'Média de gols',finished.length?(finished.reduce((s,r)=>s+r.homeGoals+r.awayGoals,0)/finished.length).toFixed(2):'—');
-  $('count').textContent=selected.length+' partida(s) · '+(mode==='demo'?'dados fictícios':'fonte: OpenLigaDB')+' · mostrando '+Math.min(visible,selected.length);
+  $('count').textContent=selected.length+' partida(s) · '+(mode==='demo'?'dados fictícios':[...new Set(selected.map(r=>r.source))].join(' + '))+' · mostrando '+Math.min(visible,selected.length);
   $('fixtures').replaceChildren();
   for(const r of selected.slice(0,visible)){
-    const card=text('article','','fixture'), detail=text('div','');
-    detail.append(text('p',r.competition.toLocaleUpperCase('pt-BR')),text('h3',r.home+' × '+r.away),text('p',new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(r.kickoff))+' · Brasília'));
-    const score=text('div',r.status==='finished'?r.homeGoals+' : '+r.awayGoals:'Não encerrada','result');
-    if(r.status==='finished') score.append(text('small',(r.corners??'—')+' escanteios · '+(r.cards??'—')+' cartões'));
-    if(r.source)detail.append(text('p',r.source+' · temporada '+r.season+'/'+(r.season+1)+' · coleta '+date(r.collectedAt)));
-    if(r.prediction) detail.append(text('p','Previsão sintética 1 / X / 2: '+r.prediction.probabilities.map(p=>(100*p).toFixed(0)+'%').join(' / ')),text('p','Modelo '+r.prediction.version+' · Registro '+new Date(r.prediction.createdAt).toISOString()));
+    const card=text('article','','fixture'),detail=text('div','');
+    detail.append(text('p',r.competition.toLocaleUpperCase('pt-BR')),text('h3',r.home+' × '+r.away),text('p',date(r.kickoff)+' · Brasília'+(r.kickoffConfirmed===false?' · horário a confirmar':'')));
+    const score=text('div',r.status==='finished'?r.homeGoals+' : '+r.awayGoals:statuses[r.status],'result');
+    if(r.status==='finished')score.append(text('small','Resultado final'));
+    if(r.venue)detail.append(text('p',r.venue));
+    if(r.source)detail.append(text('p',r.source+' · temporada '+(r.seasonLabel??`${r.season}/${r.season+1}`)+' · coleta '+date(r.collectedAt)));
+    if(r.prediction)detail.append(text('p','Previsão sintética 1 / X / 2: '+r.prediction.probabilities.map(p=>(100*p).toFixed(0)+'%').join(' / ')));
     card.append(detail,score);$('fixtures').append(card);
   }
-  if(!selected.length)$('fixtures').append(text('p','Nenhuma partida corresponde aos filtros.','empty'));
-  $('more').hidden=visible>=selected.length;
-  const scores=evaluate(selected);$('scores').replaceChildren();
-  metric($('scores'),'Previsões avaliadas',scores.count);
-  metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');
-  metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');
+  if(!selected.length)$('fixtures').append(text('p','Nenhuma partida neste período. Selecione “Todas as datas” ou outro campeonato.','empty'));
+  $('more').hidden=visible>=selected.length;$('export').disabled=!selected.length;
+  const scores=evaluate(selected);$('scores').replaceChildren();metric($('scores'),'Previsões avaliadas',scores.count);metric($('scores'),'Brier Score',scores.brier?.toFixed(3)??'—');metric($('scores'),'Log loss',scores.logLoss?.toFixed(3)??'—');renderStandings();
 }
-for(const id of ['competition','season','status','search']) $(id).addEventListener('input',()=>{visible=50;render();});
+$('competition').addEventListener('input',()=>{seasons();visible=50;render();});
+for(const id of ['season','status','search','period'])$(id).addEventListener('input',()=>{visible=50;render();});
 $('more').addEventListener('click',()=>{visible+=50;render();});
 $('export').addEventListener('click',()=>{
-  const safe=value=>'"'+String(value??'').replace(/^[=+@\-]/,"'").replaceAll('"','""')+'"';
-  const fields=['id','competition','season','home','away','kickoff','status','homeGoals','awayGoals','corners','cards','source','collectedAt'];
+  const safe=value=>'"'+String(value??'').replace(/^(\s*[=+@\-])/u,"'$1").replaceAll('"','""')+'"';
+  const fields=['id','competition','season','seasonLabel','home','away','kickoff','kickoffConfirmed','status','homeGoals','awayGoals','source','collectedAt'];
   const csv='\uFEFF'+[fields.join(','),...selected.map(r=>fields.map(k=>safe(r[k])).join(','))].join('\r\n');
-  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  const a=document.createElement('a');a.href=url;a.download=mode==='demo'?'partidas-demonstrativas.csv':'partidas-openligadb.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=mode==='demo'?'partidas-demonstrativas.csv':'football-intelligence.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
-try{
- const [response,statusResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status')]);if(!response.ok || !statusResponse.ok)throw new Error('Falha na consulta');
- const status=await statusResponse.json();mode=status.mode;rows=(await response.json()).fixtures;
- $('mode').textContent=mode==='demo'?'● DEMONSTRAÇÃO':'● DADOS REAIS';
- $('notice').textContent=mode==='demo'?'Modo de testes: todos os dados são fictícios.':`Fonte: OpenLigaDB · Última coleta: ${status.latestCollectedAt?date(status.latestCollectedAt)+' (Brasília)':'indisponível'}. ${status.stale?'A captura tem mais de 24 horas; consulte os resultados com cautela.':'Atualização periódica; não é um serviço ao vivo.'}`;
- if(mode==='demo')$('evaluation-note').textContent='Previsões sintéticas para testes. Não representam um modelo treinado.';
- $('storage').textContent=status.storage;
- for(const item of status.coverage)$('coverage-list').append(text('p',item.name+' — '+(item.status==='available'?'dados integrados':'integração pendente')));
- for(const capture of status.captures){const el=text('div','','capture');el.append(text('strong',capture.source+' · '+capture.season+'/'+(capture.season+1)),text('p','Coletado em '+date(capture.collectedAt)+' · Brasília'),text('code','SHA-256: '+capture.sha256));$('captures').append(el);}
- for(const season of [...new Set(rows.map(r=>r.season).filter(Boolean))].sort((a,b)=>b-a)){const option=text('option',season+'/'+(season+1));option.value=String(season);$('season').append(option);}
- if($('season').options.length>1)$('season').selectedIndex=1;
- for(const c of [...new Set(rows.map(r=>r.competition))].sort()) {const option=text('option',c);option.value=c;$('competition').append(option);}
- render();
-}catch{ $('fixtures').textContent='Não foi possível carregar os dados. Recarregue a página para tentar novamente.';$('export').disabled=true; }
+async function load(){
+ $('refresh').disabled=true;
+ try{
+  const [response,statusResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status')]);if(!response.ok||!statusResponse.ok)throw new Error('Falha na consulta');
+  const status=await statusResponse.json();mode=status.mode;rows=(await response.json()).fixtures;
+  $('mode').textContent=mode==='demo'?'● DEMONSTRAÇÃO':'● DADOS REAIS';
+  $('notice').textContent=mode==='demo'?'Modo de testes: dados fictícios.':`OpenLigaDB + ESPN · Última coleta: ${status.latestCollectedAt?date(status.latestCollectedAt)+' (Brasília)':'indisponível'}. ${status.stale?'Há competições sem coleta recente; consulte a cobertura abaixo.':'Dados coletados periodicamente; não é um placar ao vivo.'}`;
+  if(mode==='demo')$('evaluation-note').textContent='Previsões sintéticas para testes. Não representam um modelo treinado.';
+  $('storage').textContent=status.storage;$('coverage-list').replaceChildren();$('captures').replaceChildren();
+  for(const item of status.coverage)$('coverage-list').append(text('p',item.name+' — '+(item.status==='available'?'integrado · '+item.source+(item.stale?' · coleta defasada':'')+' · anos consultados: '+item.calendarYears.join(', '):'aguardando dados')));
+  for(const capture of status.captures){const el=text('div','','capture');el.append(text('strong',capture.scope??capture.source),text('p','Coletado em '+date(capture.collectedAt)+' · Brasília'),text('code','SHA-256: '+capture.sha256));$('captures').append(el);}
+  const previous=$('competition').value;
+  $('competition').replaceChildren(new Option('Todos os campeonatos',''));
+  for(const c of [...new Set(rows.map(r=>r.competition))].sort())$('competition').append(new Option(c,c));
+  $('competition').value=[...$('competition').options].some(o=>o.value===previous)&&previous?previous:rows.some(r=>r.competition==='Brasileirão Série A')?'Brasileirão Série A':'';
+  seasons();visible=50;render();
+ }catch{ $('notice').textContent='Sem conexão com os dados. Os resultados não estão disponíveis offline.';$('mode').textContent='● SEM CONEXÃO';rows=[];selected=[];$('metrics').replaceChildren();$('scores').replaceChildren();$('standings').replaceChildren();$('fixtures').textContent='Não foi possível carregar as partidas. Toque em Atualizar para tentar novamente.';$('export').disabled=true;$('more').hidden=true;}
+ finally{$('refresh').disabled=false;}
+}
+$('refresh').addEventListener('click',load);
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installation=event;$('install').hidden=false;});
+$('install').addEventListener('click',async()=>{if(installation){await installation.prompt();await installation.userChoice;installation=null;$('install').hidden=true;}});
+window.addEventListener('appinstalled',()=>{$('install').hidden=true;});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+await load();

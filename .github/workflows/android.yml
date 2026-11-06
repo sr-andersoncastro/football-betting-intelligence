@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths: ['android/**', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -33,3 +35,4 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+

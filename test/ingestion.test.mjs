@@ -14,3 +14,14 @@ test('não transforma placar parcial em resultado final',()=>{const [r]=normaliz
 test('falha HTTP não vira lista vazia bem-sucedida',async()=>{await assert.rejects(collect(2026,async()=>({ok:false,status:429})),/429/);});
 test('auditoria mantém correções e não permite semente antiga sobrescrever estado novo',()=>{const db=new Store();try{db.ingest(capture());db.ingest(capture('2026-11-07T12:00:00Z',4));db.ingest(capture());assert.equal(db.captures().length,2);assert.equal(db.fixtures()[0].homeGoals,4);assert.throws(()=>db.ingest({...capture(),sha256:'inválido'}),/Integridade/);assert.equal(db.fixtures()[0].homeGoals,4);}finally{db.close();}});
 test('SQLite preserva histórico e partidas entre aberturas no mesmo disco',async()=>{const directory=await mkdtemp(join(tmpdir(),'football-test-'));try{const file=join(directory,'data.sqlite');const a=new Store(file);a.ingest(capture());a.log('success','coleta');a.close();const b=new Store(file);try{assert.equal(b.fixtures().length,1);assert.equal(b.captures().length,1);assert.equal(b.logs()[0].message,'coleta');}finally{b.close();}}finally{await rm(directory,{recursive:true,force:true});}});
+test('ordena capturas pelo instante real com frações e fusos diferentes',()=>{
+ const db=new Store();
+ try{
+  db.ingest(capture('2026-11-06T12:00:00Z',3));
+  db.ingest(capture('2026-11-06T12:00:00.500Z',4));
+  db.ingest(capture('2026-11-06T14:00:00+03:00',1));
+  assert.equal(db.fixtures()[0].homeGoals,4);
+  assert.equal(db.captures()[0].collectedAt,'2026-11-06T12:00:00.500Z');
+ }finally{db.close();}
+});
+
