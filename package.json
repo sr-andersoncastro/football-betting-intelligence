@@ -1,1 +1,1 @@
-{"name":"football-betting-intelligence","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test"},"engines":{"node":">=22"}}
+{"name":"football-betting-intelligence","version":"0.2.0","private":true,"type":"module","scripts":{"start":"node server.mjs","test":"node --test","sync":"node scripts/sync.mjs"},"engines":{"node":">=24 <25"}}

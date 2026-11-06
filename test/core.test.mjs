@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateFixtures,evaluate} from '../lib.mjs';
-import {server} from '../server.mjs';
+import {server,store} from '../server.mjs';
 const data=JSON.parse(await readFile(new URL('../data/demo.json',import.meta.url),'utf8'));
 test('dados demonstrativos íntegros',()=>assert.equal(validateFixtures(data).length,6));
 test('rejeita previsão posterior ao início',()=>{const rows=structuredClone(data);rows[0].prediction.createdAt=rows[0].kickoff;assert.throws(()=>validateFixtures(rows),/anteceder/);});
@@ -15,12 +15,13 @@ test('servidor entrega painel, dados e erros seguros',async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  try{
   const base='http://127.0.0.1:'+server.address().port;
-  const health=await fetch(base+'/api/v1/health');assert.equal((await health.json()).mode,'demo');
-  const fixtures=await fetch(base+'/api/v1/fixtures');assert.equal((await fixtures.json()).fixtures.length,6);
-  const html=await fetch(base+'/');assert.match(await html.text(),/Todos os dados são fictícios/);assert.match(html.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  const health=await fetch(base+'/api/v1/health');assert.equal((await health.json()).mode,'real');
+  const fixtures=await fetch(base+'/api/v1/fixtures');const payload=await fixtures.json();assert.equal(payload.source,'OpenLigaDB');assert.ok(payload.fixtures.length>0);assert.ok(payload.fixtures.every(r=>r.source==='OpenLigaDB' && !r.prediction));
+  const html=await fetch(base+'/');assert.match(await html.text(),/Partidas reais/);assert.match(html.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   for(const path of ['/app.js','/style.css','/lib.mjs'])assert.equal((await fetch(base+path)).status,200);
-  assert.equal((await fetch(base+'/api/v1/evaluation').then(r=>r.json())).count,3);
+  assert.equal((await fetch(base+'/api/v1/evaluation').then(r=>r.json())).count,0);
+  const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='BR-A' && c.status==='pending'));
   assert.equal((await fetch(base+'/.env')).status,404);
   assert.equal((await fetch(base+'/api/v1/fixtures',{method:'POST'})).status,405);
- }finally{await new Promise(resolve=>server.close(resolve));}
+ }finally{await new Promise(resolve=>server.close(resolve));store.close();}
 });

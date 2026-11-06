@@ -1,53 +1,57 @@
-# Football Betting Intelligence
+# Football Betting Intelligence — versão 0.2
 
-Primeira versão funcional de um laboratório de análise esportiva. Interface em português para computador e celular, com dados **inteiramente sintéticos**. Não contém recomendações de apostas, comparação de odds, gestão de banca ou execução de transações.
+Base de análise esportiva com partidas reais da Bundesliga, interface em português e histórico auditável. Não contém recomendação ou execução de apostas.
 
 ## Executar
 
-Requer Node.js 22 ou superior. Sem bibliotecas externas ou instalação de dependências.
+Requer Node.js 24 (node:sqlite). Sem dependências externas.
 
-```sh
+```
 npm start
 ```
 
-Abra http://localhost:3000. Para testar: `npm test`.
+Abra http://localhost:3000. `npm test` executa os testes. `npm run sync` atualiza a captura versionada de duas temporadas. O modo fictício só é ativado explicitamente por DATA_MODE=demo; o padrão é real.
 
-No PowerShell, uma porta alternativa pode ser definida com `$env:PORT=3001` antes de iniciar. O aplicativo lê a variável do processo, não carrega arquivos `.env` automaticamente.
+## Dados reais e cobertura
 
-## O que funciona
+Fonte comunitária: [OpenLigaDB](https://www.openligadb.de/), [documentação](https://api.openligadb.de/index.html). A integração usa /getmatchdata/bl1/{temporada}. Não exige chave. A comunidade pode corrigir resultados; não é feed profissional nem cobertura ao vivo.
 
-- Painel responsivo de partidas e estatísticas de gols, escanteios e cartões.
-- Filtros por campeonato, situação e equipe.
-- Exportação CSV da seleção.
-- Avaliação de previsões sintéticas 1X2 com Brier multiclasse (soma, intervalo 0–2) e log loss natural.
-- Registro da versão e horário de cada previsão; validação impede previsões registradas no início ou após a partida.
-- API somente de leitura, sem credenciais e sem escrita remota.
+Integrado: Bundesliga, temporada atual e anterior, partidas, equipes, datas UTC e resultado final por resultTypeID=2. O painel informa temporada, fonte, coleta e hash SHA-256. Resultados parciais nunca viram placares finais. Ausências são null, nunca zero inventado.
 
-### Rotas
+Pendente: Brasileirão A e B, Premier League, La Liga e Champions League. Não há cobertura integrada de escanteios, cartões, xG ou escalações. Não há modelo treinado nem previsões reais; Brier e log loss ficam sem resultado até existirem previsões válidas.
 
-`GET /api/v1/health`, `/api/v1/fixtures`, `/api/v1/evaluation`.
+## Histórico e persistência
 
-## Estrutura
+SQLite armazena capturas brutas, SHA-256, horário de coleta, origem, partidas normalizadas e logs. Cada correção cria nova captura; uma semente antiga não sobrescreve um estado mais recente. Capturas brutas preservam a resposta original; a versão no arquivo data/openliga.json usa gzip/base64 e é validada antes da ingestão.
 
-`server.mjs`: servidor e rotas; `lib.mjs`: validação e avaliação; `public/`: interface; `data/demo.json`: conjunto fictício; `test/`: testes de integridade, métricas e HTTP.
+O servidor abre a captura versionada ao iniciar, tenta atualizar a temporada atual e consulta novamente a cada seis horas enquanto está ativo. Falhas mantêm os últimos dados e geram log; não há substituição silenciosa por demonstração. A interface é uma fotografia da consulta; recarregue para obter os dados atualizados.
 
-## Arquitetura e próximos marcos
+**Render Free usa disco efêmero:** SQLite não sobrevive necessariamente a reinícios/publicações. A captura versionada é a recuperação mínima. O workflow Football data snapshots busca as duas temporadas às 06:17 e 18:17 UTC (03:17 e 15:17 de Brasília), testa e registra a captura no histórico Git, sujeito a habilitação, atrasos e cotas do GitHub Actions. Falhas de push (por exemplo, mudanças concorrentes) encerram a execução sem forçar sobrescrita. O workflow não garante disponibilidade contínua e o Render pode dormir. As execuções programadas ainda precisam de confirmação em produção.
 
-Esta entrega é uma base Node.js demonstrativa, não a implementação Python/FastAPI/PostgreSQL descrita no planejamento original. A escolha permite executar e verificar o primeiro painel no ambiente disponível, sem serviços pagos ou chaves. Não há sincronização de dados reais nem banco persistente de produção nesta versão.
+Para um histórico operacional completo e persistente, próximo passo: PostgreSQL externo e migrações. DATA_DIR permite usar um disco persistente quando houver; por padrão usa runtime/, ignorado pelo Git.
 
-1. Definir fornecedor e verificar a cobertura atual de cada campeonato, licença de uso e cotas antes da integração. Não há promessa de cobertura gratuita de Série B ou de dados ao vivo.
-2. Implementar aquisição no servidor e normalização de identificadores, fusos horários, estatísticas e eventos; manter fonte, horário de captura e payload original para auditoria. Chaves ficam exclusivamente no servidor.
-3. Adicionar PostgreSQL e migrações para competições, equipes, partidas, estatísticas, execuções de coleta, versões de modelos e previsões. Nunca substituir um resultado real por dados demonstrativos silenciosamente.
-4. Construir modelos de análise esportiva com divisão cronológica dos dados, comparação com baselines, calibração e validação prospectiva. Registrar o corte dos dados de treinamento além do horário da previsão; o horário sozinho não demonstra ausência de vazamento.
-5. Preparar hospedagem HTTPS e autenticação antes de armazenar informações pessoais ou liberar operações administrativas. O servidor atual expõe apenas a demonstração pública, sem autenticação.
-6. Avaliar aplicativo Android após a versão web hospedada e testada. Nenhum APK foi gerado.
+## API somente de leitura
 
-O arquivo Dockerfile permite empacotar esta demonstração. A imagem requer download e foi incluída para uso futuro; sua execução depende de Docker instalado. Não há publicação automática, contratação de serviços, APIs externas ou contas novas.
+- GET /api/v1/health: versão e modo.
+- GET /api/v1/fixtures: partidas normalizadas.
+- GET /api/v1/data-status: cobertura, capturas recentes, integridade, falhas e defasagem (>24h).
+- GET /api/v1/evaluation: métricas de previsões previamente registradas, se existirem.
 
-## Limites da avaliação
+Horários no painel: America/Sao_Paulo. Exportação CSV inclui origem, temporada e horário de coleta. Lista paginada de 50 em 50; CSV contém toda a seleção.
 
-Os indicadores usam três exemplos fictícios e **não são evidência de capacidade preditiva**. Não há modelo treinado, backtest walk-forward, estimativa de confiança, sistema em tempo real ou previsão de partidas reais. Datas e nomes são ilustrativos. O painel mostra horários de Brasília.
+## Validação
 
-## Segurança
+Testes cobrem seleção do resultado final independente da ordem, ausências, erros HTTP, integridade de captura, correções, restauração SQLite, validação probabilística e HTTP. Ainda não há validação de modelo preditivo nem teste em aparelho Android. O aplicativo Android existente carrega o painel hospedado; veja android/README.md.
 
-Não coloque senhas ou chaves no repositório. As rotas aceitam apenas GET, servem uma lista fixa de arquivos e aplicam uma política de conteúdo restrita. Importações futuras devem passar pela validação de esquema e ser auditadas. O CSV é exportado localmente no navegador.
+## Infraestrutura
+
+Dockerfile com Node 24 incluído; Docker não foi executado neste ambiente. No Render: runtime Node, build npm install, start npm start, raiz vazia. .node-version e engines fixam Node 24. Nenhuma contratação nem credencial externa é necessária para esta fonte.
+
+## Próximos marcos
+
+1. Validar um fornecedor para Brasil A/B e campos adicionais.
+2. Migrar capturas e histórico operacional para PostgreSQL persistente.
+3. Desenvolver baselines de análise esportiva, treino com corte temporal, avaliação walk-forward e calibração.
+4. Validar prospectivamente os modelos antes de apresentar previsões reais.
+
+Não coloque senhas ou chaves no repositório. A API serve somente uma lista fixa de arquivos, não expõe SQLite ou respostas brutas e aceita apenas GET. Não há informações pessoais nem operações administrativas na aplicação.
