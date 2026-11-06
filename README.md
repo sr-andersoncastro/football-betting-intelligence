@@ -39,6 +39,8 @@ O site é responsivo, com filtros por campeonato, temporada, período, situaçã
 
 Publicado em HTTPS, pode ser instalado como PWA: no Chrome do Android, menu ⋮ → Instalar aplicativo / Adicionar à tela inicial. Quando disponível, o site mostra um botão Instalar. No iPhone: Safari → Compartilhar → Adicionar à Tela de Início. Não é necessário instalar pela Play Store.
 
+A tela inicial segue um layout de app: barra superior com busca de equipe e menu lateral, faixa de datas (ontem e os próximos 6 dias, em Brasília), jogos agrupados por campeonato e abas inferiores no celular. Nos jogos agendados das quatro ligas do piloto, cada linha mostra as probabilidades experimentais de 1 / X / 2 (mandante, empate, visitante); nas demais, aparece “—”. São probabilidades do modelo, não odds de casas de apostas: o site não oferece apostas, “apostas do dia” ou recomendações. Os filtros ficam recolhidos em “Filtros”.
+
 Manifesto, ícones PNG e service worker estão incluídos. O cache guarda apenas a interface. As APIs não são armazenadas offline: sem rede, aparece uma mensagem de indisponibilidade, sem apresentar um placar antigo como atual. A instalação depende do navegador e de suas regras de elegibilidade. Não foi validada em um aparelho físico.
 
 Há também o projeto de APK Android WebView, apontando para `https://football-betting-intelligence.onrender.com/`. Veja [android/README.md](android/README.md). O APK depende desse site publicado; código Android não embute uma cópia da base de resultados.
