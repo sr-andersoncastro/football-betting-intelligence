@@ -100,8 +100,8 @@ aside{background:linear-gradient(180deg,#171539,#0f0e27);border-right:1px solid 
 .scenario-list p{margin:0;font-size:12px}
 
 /* Folha de cenários aberta pelo botão flutuante */
-dialog#scenario-dialog{width:min(640px,94vw);max-height:88vh;padding:18px;border:1px solid #ffffff22;border-radius:22px;color:#f1f0ff;background:linear-gradient(160deg,#242056,#12112b);box-shadow:0 30px 70px -10px #000,0 1px 0 #ffffff2e inset;overflow:auto}
-dialog#scenario-dialog::backdrop{background:#05051099;backdrop-filter:blur(4px)}
+dialog#scenario-dialog,dialog.sheet{width:min(640px,94vw);max-height:88vh;padding:18px;border:1px solid #ffffff22;border-radius:22px;color:#f1f0ff;background:linear-gradient(160deg,#242056,#12112b);box-shadow:0 30px 70px -10px #000,0 1px 0 #ffffff2e inset;overflow:auto}
+dialog#scenario-dialog::backdrop,dialog.sheet::backdrop{background:#05051099;backdrop-filter:blur(4px)}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.sheet-head h2{margin:0}.sheet-head button{width:38px;height:38px;border-radius:50%;padding:0}
 .scenario-game{border-top:1px solid #ffffff18;padding:14px 0}.scenario-game h3{margin:0;font-size:15px}.scenario-game p{margin:2px 0 8px}
 .scenario-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}.scenario-chip{background:linear-gradient(180deg,#2b2866,#1a1840);border-radius:12px;padding:10px 6px;text-align:center;box-shadow:0 1px 0 #ffffff2e inset,0 6px 12px -6px #000a}
@@ -124,3 +124,11 @@ main>#tips{order:2;padding:14px;border:0;background:transparent;box-shadow:none}
 .tip-pick{text-align:center;font-size:12px;line-height:1.3}.tip-pick small{display:block;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:#cbbfff}.tip-pick strong{display:block;color:#ffc15e}
 .tip-prob{text-align:right;font-size:17px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
 @media(max-width:900px){main>#tips{padding:10px 0}.tip-row{grid-template-columns:46px minmax(0,1fr) 84px 46px;gap:8px;padding:10px}.tip-row .match-teams p{font-size:14px}.tip-prob{font-size:15px}}
+
+/* Filtro avançado */
+.tip-tools{display:flex;justify-content:flex-end;margin-top:8px}.filter-button{border-radius:22px;padding:9px 16px;font-size:13px;font-weight:600}
+#filter-count{display:inline-block;min-width:18px;margin-left:8px;border-radius:9px;background:#ff4d8d;padding:1px 6px;font-size:11px}
+.filter-group{border-top:1px solid #ffffff18;padding:14px 0}.filter-group h3{margin:0 0 10px;font-size:14px}.filter-group label{display:block;margin:8px 0;font-size:13px;color:#e3e1ff}
+.filter-group output{color:#ffc15e;font-weight:700}.filter-group input[type=range]{width:100%;padding:0;accent-color:#ff4d8d;border:0;background:transparent}
+.filter-group .check{display:flex;align-items:center;gap:8px}.filter-group .check input{width:auto;margin:0;accent-color:#7c5cff}
+.filter-actions{display:flex;gap:10px;justify-content:space-between;border-top:1px solid #ffffff18;padding-top:14px}.filter-actions button{flex:1}
