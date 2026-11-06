@@ -20,12 +20,13 @@ jobs:
       - id: sync
         continue-on-error: true
         run: npm run sync
+      - run: node scripts/predict.mjs
       - run: npm test
       - name: Preserve capture in repository history
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/openliga.json data/espn.json
+          git add data/openliga.json data/espn.json data/predictions.json
           if ! git diff --cached --quiet; then
             git commit -m "Refresh audited OpenLigaDB captures"
             git push

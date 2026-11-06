@@ -23,6 +23,9 @@ test('servidor entrega painel, dados e erros seguros',async()=>{
   assert.equal(table.source,'OpenLigaDB + ESPN');assert.ok(table.groups.length>0);
   assert.ok(table.groups.every(g=>g.teams.every(t=>t.played===t.won+t.drawn+t.lost && t.points===3*t.won+t.drawn)));
   assert.equal((await fetch(base+'/api/v1/evaluation').then(r=>r.json())).count,0);
+  const prediction=await fetch(base+'/api/v1/predictions').then(r=>r.json());
+  assert.equal(prediction.competitionCode,'bra.1');assert.equal(prediction.status,'experimental');assert.ok(prediction.trainingMatches>160);assert.ok(prediction.walkForward.model.count>0);
+  assert.ok(prediction.forecasts.every(p=>p.probabilities.length===3 && Date.parse(p.createdAt)<Date.parse(p.kickoff)));
   const audit=await fetch(base+'/api/v1/data-status').then(r=>r.json());assert.ok(audit.captures.length>=2);assert.ok(audit.coverage.some(c=>c.code==='bra.1' && c.status==='available'));
   const manifest=await fetch(base+'/manifest.webmanifest').then(r=>r.json());assert.equal(manifest.display,'standalone');assert.equal(manifest.icons.length,2);
   assert.equal(audit.coverage.length,11);assert.ok(payload.fixtures.some(r=>r.competitionCode==='bra.2'));

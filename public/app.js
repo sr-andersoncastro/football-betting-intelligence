@@ -1,7 +1,7 @@
 import {evaluate} from '/lib.mjs';
 import {standings} from '/analytics.mjs';
 const $=id=>document.getElementById(id);
-let rows=[],selected=[],mode='real',visible=50,installation;
+let rows=[],selected=[],mode='real',visible=50,installation,forecastReport;
 const formatter=new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'});
 const date=value=>formatter.format(new Date(value));
 const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
@@ -32,6 +32,28 @@ function renderStandings(){
     table.append(body);const wrapper=text('div','','table-scroll');wrapper.tabIndex=0;wrapper.setAttribute('role','region');wrapper.setAttribute('aria-label',caption.textContent);wrapper.append(table);$('standings').append(wrapper);
   }
   if(!$('standings').children.length)$('standings').append(text('p','Sem classificação de liga nesta seleção. Competições de copa exibem partidas e resultados, sem uma tabela única que misture fases.','empty'));
+}
+function renderModel(){
+  $('predictions').replaceChildren();$('model-scores').replaceChildren();
+  const report=forecastReport;
+  if(!report?.walkForward){$('model-notice').textContent='Modelo disponível somente com dados reais do Brasileirão Série A.';return;}
+  const p=report.prospectiveEvaluation,w=report.walkForward;
+  $('model-notice').textContent=`Aprendizado de máquina experimental · ${report.trainingMatches} partidas no treino · Coleta: ${report.latestDataAt?date(report.latestDataAt):'indisponível'} · ${report.dataStale?'Coleta defasada: previsões suspensas.':'Resultados recentes, mando de campo e força das equipes.'}`;
+  for(const f of report.forecasts){
+    const card=text('article','','prediction');card.append(text('h3',f.home+' × '+f.away),text('p',date(f.kickoff)+' · Brasília'));
+    const probabilities=text('div','','metrics');
+    [f.home,'Empate',f.away].forEach((label,i)=>metric(probabilities,label,(100*f.probabilities[i]).toFixed(1)+'%'));card.append(probabilities);
+    const h=f.evidence.home,a=f.evidence.away;
+    card.append(text('p',`Forma recente suavizada: ${f.home}, ${h.lastTen.points.toFixed(2)} pontos/jogo; ${f.away}, ${a.lastTen.points.toFixed(2)}. No mando desta partida: ${h.venueLastTen.points.toFixed(2)} em casa e ${a.venueLastTen.points.toFixed(2)} fora.`),text('p','Registro: '+date(f.createdAt)+' · Histórico anterior a '+date(f.trainingCutoff)+' · Modelo '+f.version,'muted'));
+    $('predictions').append(card);
+  }
+  if(!report.forecasts.length)$('predictions').append(text('p','Sem probabilidades disponíveis para os próximos 7 dias. A partida precisa estar agendada, ter horário confirmado, coleta recente e histórico suficiente.','empty'));
+  $('model-validation').textContent=w.model.count?`Teste histórico temporal: ${w.model.count} jogos. Acerto do resultado mais provável: ${(100*w.model.accuracy).toFixed(1)}%; referência simples: ${(100*w.baseline.accuracy).toFixed(1)}%. ${w.model.accuracy>w.baseline.accuracy?'A diferença observada não garante melhora futura.':'Maior taxa de acerto ainda não foi demonstrada nesta amostra.'} Teste retrospectivo com dados atuais corrigidos pela fonte; não são previsões registradas no passado.`:'Histórico insuficiente para avaliar o modelo.';
+  metric($('model-scores'),'Brier do modelo (menor é melhor)',w.model.brier?.toFixed(3)??'—');
+  metric($('model-scores'),'Brier da referência',w.baseline.brier?.toFixed(3)??'—');
+  metric($('model-scores'),'Previsões futuras já avaliadas',p?.count??0);
+  $('prospective-note').textContent=p?.count?`Previsões preservadas antes do início: ${p.count} jogos; acerto ${(100*p.accuracy).toFixed(1)}%, Brier ${p.brier.toFixed(3)}.`:'A avaliação prospectiva começará após o término dos jogos com previsões registradas. Não há taxa de acerto futuro comprovada.';
+  $('prospective-note').append(document.createTextNode(' '+report.storage));
 }
 function render(){
   const period=$('period').value;
@@ -71,8 +93,9 @@ $('export').addEventListener('click',()=>{
 async function load(){
  $('refresh').disabled=true;
  try{
-  const [response,statusResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status')]);if(!response.ok||!statusResponse.ok)throw new Error('Falha na consulta');
+  const [response,statusResponse,modelResponse]=await Promise.all([fetch('/api/v1/fixtures'),fetch('/api/v1/data-status'),fetch('/api/v1/predictions').catch(()=>null)]);if(!response.ok||!statusResponse.ok)throw new Error('Falha na consulta');
   const status=await statusResponse.json();mode=status.mode;rows=(await response.json()).fixtures;
+  forecastReport=modelResponse?.ok?await modelResponse.json():null;renderModel();
   $('mode').textContent=mode==='demo'?'● DEMONSTRAÇÃO':'● DADOS REAIS';
   $('notice').textContent=mode==='demo'?'Modo de testes: dados fictícios.':`OpenLigaDB + ESPN · Última coleta: ${status.latestCollectedAt?date(status.latestCollectedAt)+' (Brasília)':'indisponível'}. ${status.stale?'Há competições sem coleta recente; consulte a cobertura abaixo.':'Dados coletados periodicamente; não é um placar ao vivo.'}`;
   if(mode==='demo')$('evaluation-note').textContent='Previsões sintéticas para testes. Não representam um modelo treinado.';
@@ -84,7 +107,7 @@ async function load(){
   for(const c of [...new Set(rows.map(r=>r.competition))].sort())$('competition').append(new Option(c,c));
   $('competition').value=[...$('competition').options].some(o=>o.value===previous)&&previous?previous:rows.some(r=>r.competition==='Brasileirão Série A')?'Brasileirão Série A':'';
   seasons();visible=50;render();
- }catch{ $('notice').textContent='Sem conexão com os dados. Os resultados não estão disponíveis offline.';$('mode').textContent='● SEM CONEXÃO';rows=[];selected=[];$('metrics').replaceChildren();$('scores').replaceChildren();$('standings').replaceChildren();$('fixtures').textContent='Não foi possível carregar as partidas. Toque em Atualizar para tentar novamente.';$('export').disabled=true;$('more').hidden=true;}
+ }catch{ $('notice').textContent='Sem conexão com os dados. Os resultados não estão disponíveis offline.';$('mode').textContent='● SEM CONEXÃO';rows=[];selected=[];$('metrics').replaceChildren();$('scores').replaceChildren();$('standings').replaceChildren();$('predictions').replaceChildren();$('model-scores').replaceChildren();$('model-notice').textContent='Probabilidades indisponíveis sem conexão.';$('fixtures').textContent='Não foi possível carregar as partidas. Toque em Atualizar para tentar novamente.';$('export').disabled=true;$('more').hidden=true;}
  finally{$('refresh').disabled=false;}
 }
 $('refresh').addEventListener('click',load);

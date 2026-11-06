@@ -2,13 +2,15 @@ import { DatabaseSync } from 'node:sqlite';
 import {createHash} from 'node:crypto';
 import {normalize} from './providers/openliga.mjs';
 import {normalize as normalizeESPN} from './providers/espn.mjs';
+import {validateFixtures} from './lib.mjs';
 export class Store {
   constructor(path=':memory:') {
     this.db=new DatabaseSync(path);
     this.db.exec(`PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS captures(id INTEGER PRIMARY KEY, source TEXT NOT NULL, url TEXT NOT NULL, season INTEGER NOT NULL, collected_at TEXT NOT NULL, sha256 TEXT NOT NULL, raw TEXT NOT NULL, UNIQUE(season,collected_at,sha256));
       CREATE TABLE IF NOT EXISTS fixtures(id TEXT PRIMARY KEY, season INTEGER NOT NULL, kickoff TEXT NOT NULL, capture_id INTEGER NOT NULL REFERENCES captures(id), json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS sync_logs(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL, status TEXT NOT NULL, message TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS sync_logs(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL, status TEXT NOT NULL, message TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS predictions(id INTEGER PRIMARY KEY,fixture_id TEXT NOT NULL,version TEXT NOT NULL,kickoff TEXT NOT NULL,data_hash TEXT NOT NULL,created_at TEXT NOT NULL,json TEXT NOT NULL,UNIQUE(fixture_id,version,kickoff,data_hash));`);
     if(!this.db.prepare('PRAGMA table_info(captures)').all().some(c=>c.name==='scope')) {
       this.db.exec("ALTER TABLE captures ADD COLUMN scope TEXT NOT NULL DEFAULT ''; UPDATE captures SET scope='openliga:bl1:' || season;");
     }
@@ -48,6 +50,21 @@ export class Store {
   captures(){return this.db.prepare('SELECT id,source,url,season,scope,collected_at AS collectedAt,sha256 FROM captures ORDER BY julianday(collected_at) DESC,id DESC LIMIT 40').all();}
   coverage(){return this.db.prepare(`SELECT scope,source,season,collected_at AS collectedAt FROM captures c WHERE id=(SELECT id FROM captures WHERE scope=c.scope ORDER BY julianday(collected_at) DESC,id DESC LIMIT 1)`).all();}
   log(status,message){this.db.prepare('INSERT INTO sync_logs(occurred_at,status,message) VALUES(?,?,?)').run(new Date().toISOString(),status,String(message).slice(0,500));}
+  savePredictions(predictions,fixtures,now=new Date()){
+    const matches=new Map(fixtures.map(r=>[r.id,r]));
+    const eligible=predictions.map(p=>{
+      const match=matches.get(p.fixtureId);
+      if(!match||match.competitionCode!=='bra.1'||match.status!=='scheduled'||p.kickoff!==match.kickoff||Date.parse(p.kickoff)<=now.getTime()||!p.dataHash||Date.parse(p.createdAt)>now.getTime())throw new Error('Registro de previsão inválido');
+      validateFixtures([{...match,prediction:p}]);return p;
+    });
+    this.db.exec('BEGIN');
+    try{
+      const insert=this.db.prepare('INSERT OR IGNORE INTO predictions(fixture_id,version,kickoff,data_hash,created_at,json) VALUES(?,?,?,?,?,?)');
+      for(const p of eligible)insert.run(p.fixtureId,p.version,p.kickoff,p.dataHash,p.createdAt,JSON.stringify(p));
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  predictions(){return this.db.prepare('SELECT json FROM predictions ORDER BY created_at,id').all().map(r=>JSON.parse(r.json));}
   logs(){return this.db.prepare('SELECT occurred_at AS occurredAt,status,message FROM sync_logs ORDER BY id DESC LIMIT 20').all();}
   close(){this.db.close();}
 }

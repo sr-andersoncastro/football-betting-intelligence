@@ -1,6 +1,6 @@
-# Football Betting Intelligence — versão 0.3
+# Football Betting Intelligence — versão 0.4
 
-Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não contém recomendação ou execução de apostas nem previsões treinadas.
+Site em português com Brasileirão e futebol internacional, resultados reais, classificação calculada e instalação como PWA no Android. Não executa apostas nem apresenta recomendação comercial de apostas. Inclui um modelo experimental para o Brasileirão Série A.
 
 ## Executar
 
@@ -40,6 +40,20 @@ Manifesto, ícones PNG e service worker estão incluídos. O cache guarda apenas
 
 Há também o projeto de APK Android WebView, apontando para `https://football-betting-intelligence.onrender.com/`. Veja [android/README.md](android/README.md). O APK depende desse site publicado; código Android não embute uma cópia da base de resultados.
 
+## Probabilidades do Brasileirão Série A
+
+`GET /api/v1/predictions` retorna probabilidades experimentais de vitória da casa, empate e vitória visitante para partidas agendadas nos próximos 7 dias, com horário confirmado e coleta de até 24 horas. Nenhuma outra liga recebe previsões. O modelo aprende os pesos de uma regressão logística multiclasse (softmax), com atualização sequencial e regularização L2, sem API de IA paga ou dependências externas.
+
+Usa desempenho recente (últimos 10 jogos, pesos decrescentes e suavização), gols marcados/sofridos, desempenho em casa/fora e Elo atualizado com resultados anteriores. Exige pelo menos 160 partidas no treino e 8 jogos anteriores por equipe. Não usa escalações, notícias, lesões, suspensões ou odds e não compara valor de apostas.
+
+O corte de treino é o início do dia UTC. Resultados só entram após uma margem de 6 horas desde o início da partida e nunca são usados nas previsões de seu próprio dia. A avaliação walk-forward reconstrói os mesmos cortes por dia, compara Brier, log loss e acerto com as frequências anteriores de resultados, e fornece os registros e faixas de calibração. É uma simulação retrospectiva com dados atualmente corrigidos pelo fornecedor; não reconstrói a disponibilidade histórica exata nem comprova ganho futuro.
+
+As previsões para jogos futuros são registradas antes do início, com versão, probabilidades, corte de treino, indicadores e hash dos dados. O registro para a mesma partida, horário, versão e hash é imutável. A avaliação prospectiva usa a última previsão preservada antes do início, uma por partida; mudanças no horário impedem associar o registro antigo ao novo jogo. As probabilidades não são anexadas retroativamente aos resultados históricos.
+
+`npm run predict` preserva as previsões da captura versionada em `data/predictions.json`. O workflow de coleta executa essa etapa e versiona os registros para sobreviverem ao disco efêmero do Render. Falhas ou atrasos no workflow podem deixar registros recentes somente no SQLite local. Nenhum serviço pago é provisionado.
+
+O modelo permanece experimental. Não há garantia de maior acerto; uma melhora no erro das probabilidades não equivale necessariamente a melhora em acertar o resultado mais provável. O painel mostra as métricas do modelo e da referência sem prometer lucro.
+
 ## Classificação
 
 Calculada por liga e temporada a partir dos resultados finais disponíveis. Exibe jogos, vitórias, empates, derrotas, gols, saldo, pontos e aproveitamento. Usa somente os filtros de campeonato e temporada. Copas exibem partidas e resultados, sem uma tabela única que misture fases e mata-mata.
@@ -63,6 +77,7 @@ Use Node 24, build `npm install`, start `npm start`, health check `/api/v1/healt
 ## API somente de leitura
 
 - `GET /api/v1/health`: versão e modo.
+- `GET /api/v1/predictions`: modelo da Série A, previsões, teste temporal e avaliação prospectiva.
 - `GET /api/v1/fixtures`: partidas e origem de cada registro.
 - `GET /api/v1/standings`: classificação calculada por liga/temporada, com regras explícitas.
 - `GET /api/v1/data-status`: cobertura por competição, períodos, defasagem, capturas e logs.
@@ -74,4 +89,4 @@ A lista de arquivos públicos é fixa. SQLite, capturas brutas e credenciais nã
 
 `npm test` cobre as duas fontes, estados de partidas, placares finais, isolamento entre ligas, migração SQLite, correções, integridade, persistência, classificação, probabilidades e rotas HTTP, incluindo manifesto e ícones. Application tests roda em pushes para main e pull requests.
 
-A interface, a instalação no Android e o APK ainda exigem verificação em navegador/aparelho real. Não há modelo preditivo validado. Próximas extensões: feed com contrato e cobertura garantida, tabelas oficiais por fase, persistência externa e modelos com avaliação temporal prospectiva.
+A interface, a instalação no Android e o APK ainda exigem verificação em navegador/aparelho real. O modelo da Série A ainda exige validação prospectiva. Próximas extensões: feed com contrato e cobertura garantida, tabelas oficiais por fase, persistência externa e modelos com avaliação temporal prospectiva.

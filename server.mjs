@@ -5,6 +5,7 @@ import {gunzipSync} from 'node:zlib';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateFixtures, evaluate } from './lib.mjs';
 import { standings } from './analytics.mjs';
+import {buildForecast,evaluateRecorded} from './model.mjs';
 import {Store} from './store.mjs';
 import {collect} from './providers/openliga.mjs';
 import {collect as collectESPN,leagues} from './providers/espn.mjs';
@@ -23,6 +24,26 @@ if(!demo){
 }
 const demoFixtures=demo?validateFixtures(JSON.parse(await readFile(new URL('data/demo.json',root),'utf8'))):[];
 const getFixtures=()=>demo?demoFixtures:store.fixtures();
+let preservedPredictions=[];
+if(!demo){
+  try{
+    const ledger=JSON.parse(await readFile(new URL('data/predictions.json',root),'utf8'));
+    preservedPredictions=ledger.predictions.filter(p=>{
+      try{validateFixtures([{id:p.fixtureId,home:p.home,away:p.away,competition:'Brasileirão Série A',kickoff:p.kickoff,status:'scheduled',prediction:p}]);return Date.parse(p.createdAt)<=Date.now();}catch{return false;}
+    });
+  }catch(error){if(error.code!=='ENOENT')store.log('error','Registros de previsão: '+error.message);}
+}
+let forecastReport;
+function refreshForecast(){
+  if(demo)return;
+  const now=new Date(),fixtures=getFixtures(),report=buildForecast(fixtures,now);
+  store.savePredictions(report.forecasts,fixtures,now);
+  const archived=[...preservedPredictions,...store.predictions()];
+  // Reuse the original immutable registration time for an unchanged forecast.
+  report.forecasts=report.forecasts.map(p=>archived.find(a=>a.fixtureId===p.fixtureId&&a.version===p.version&&a.kickoff===p.kickoff&&a.dataHash===p.dataHash)??p);
+  forecastReport={...report,prospectiveEvaluation:evaluateRecorded(archived,fixtures,now),storage:'Registros locais mais arquivo versionado no GitHub. O workflow preserva previsões periodicamente; registros locais ainda não versionados podem ser perdidos em reinícios.'};
+}
+refreshForecast();
 let syncing=false;
 export async function sync(){
   if(syncing)return;
@@ -35,7 +56,7 @@ export async function sync(){
       try{const capture=await job();store.ingest(capture);store.log('success',`${label}: ${capture.fixtures.length} partidas coletadas`);}
       catch(error){store.log('error',label+': '+error.message);}
     }
-  }finally{syncing=false;}
+  }finally{try{refreshForecast();}catch(error){store.log('error','Modelo: '+error.message);}syncing=false;}
 }
 function coverageStatus(){
   const captures=store.coverage();
@@ -53,7 +74,13 @@ export const server = http.createServer(async (req,res)=>{
   if(req.method !== 'GET') {res.writeHead(405,{'Allow':'GET'});return res.end();}
   const url = new URL(req.url,'http://localhost');
   const json = value => {res.writeHead(200,{'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(value));};
-  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.3.0'});
+  if(url.pathname === '/api/v1/health') return json({status:'ok',mode:demo?'demo':'real',version:'0.4.0'});
+  if(url.pathname === '/api/v1/predictions'){
+    if(demo)return json({status:'unavailable',reason:'Modelo exclusivo para dados reais do Brasileirão Série A.',forecasts:[]});
+    if(forecastReport.trainingCutoff.slice(0,10)!==new Date().toISOString().slice(0,10))refreshForecast();
+    const now=Date.now();
+    return json({...forecastReport,forecasts:forecastReport.forecasts.filter(p=>Date.parse(p.kickoff)>now&&now-Date.parse(forecastReport.latestDataAt)<=24*3600000)});
+  }
   if(url.pathname === '/api/v1/fixtures') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',fixtures:getFixtures()});
   if(url.pathname === '/api/v1/standings') return json({source:demo?'synthetic':'OpenLigaDB + ESPN',groups:standings(getFixtures()),rules:'3 pontos por vitória; desempate por saldo, gols marcados e nome. Sem ajustes disciplinares ou critérios oficiais adicionais.'});
   if(url.pathname === '/api/v1/data-status') {
