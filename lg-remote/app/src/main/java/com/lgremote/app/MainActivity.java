@@ -2,8 +2,10 @@ package com.lgremote.app;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
 import android.graphics.Color;
 import android.view.View;
 import android.view.WindowInsets;
@@ -12,6 +14,8 @@ import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+
+import org.json.JSONArray;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -29,7 +33,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
+    private static final int REQ_VOICE = 77;
     private WebView web;
+
+    private void js(String code) { web.evaluateJavascript(code, null); }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_VOICE) return;
+        if (res == RESULT_OK && data != null) {
+            ArrayList<String> r = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (r != null && !r.isEmpty()) { js("window.__voice && window.__voice(" + new JSONArray(r).toString() + ")"); return; }
+        }
+        js("window.__voiceErr && window.__voiceErr('Não ouvi nenhum comando')");
+    }
 
     /** Ponte mínima para ligar a TV (Wake-on-LAN). Só existe no assets locais do app. */
     public class Native {
@@ -54,6 +72,24 @@ public class MainActivity extends Activity {
                     } catch (Exception ignored) { }
                 }
             }).start();
+        }
+
+
+        /** Abre o reconhecimento de voz do Android (pt-BR). Resposta em window.__voice([...]) ou window.__voiceErr(msg). */
+        @JavascriptInterface
+        public void listen() {
+            runOnUiThread(new Runnable() { @Override public void run() {
+                try {
+                    Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                    i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                    i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR");
+                    i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Diga o comando para a TV");
+                    i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
+                    startActivityForResult(i, REQ_VOICE);
+                } catch (Exception e) {
+                    js("window.__voiceErr && window.__voiceErr('Reconhecimento de voz indisponível neste celular')");
+                }
+            } });
         }
 
         /** Procura TVs LG na rede (SSDP; se nada, varre a sub-rede na porta 3000). Resposta em window.__tvsFound(json). */

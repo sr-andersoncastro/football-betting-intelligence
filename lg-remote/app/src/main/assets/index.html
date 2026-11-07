@@ -46,6 +46,8 @@
   .rocker button:active { background:rgba(255,255,255,.12); }
   .mid { display:flex; flex-direction:column; align-items:center; gap:8px; }
   .mid .key { width:50px; height:50px; font-size:19px; }
+  #micBtn { color:#ff2a4f; border-color:#4d1a25; }
+  #micBtn.on { background:linear-gradient(180deg,#d4143c,#8e0a26); color:#fff; box-shadow:0 0 0 4px rgba(212,20,60,.35); }
   .hg { width:46px; height:46px; font-size:20px; }
 
   /* aro de setas */
@@ -118,7 +120,7 @@
     <div class="rocker"><button data-act="volUp">+</button><button data-act="volDown">−</button></div>
     <div class="mid">
       <button class="key round" data-act="mute">🔇</button>
-      <button class="key round" data-more="1" title="Teclado e mais">⌨</button>
+      <button class="key round" id="micBtn" title="Comando de voz">🎤</button>
     </div>
     <div class="rocker"><button data-act="chUp">⌃</button><button data-act="chDown">⌄</button></div>
   </div>
@@ -181,6 +183,7 @@
   <div class="g2"><select id="apps"></select><button class="key btn" id="goApp" style="padding:0 16px">Abrir</button></div>
   <div class="gg"><button class="key btn" data-act="screenOff">Tela apagada</button><button class="key btn" data-act="screenOn">Tela acesa</button></div>
   <div class="g4"><button class="key btn" data-btn="INFO">Info</button><button class="key btn" data-btn="MENU">Menu</button><button class="key btn" data-btn="CC">Legenda</button><button class="key btn" data-btn="ASTERISK">✱</button></div>
+  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “HDMI 1”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
   <div class="lbl">Mensagem na tela da TV</div>
   <div class="g2"><input id="toast" placeholder="Texto"><button class="key btn" id="sendToast" style="padding:0 16px">Enviar</button></div>
   <button class="key btn" id="wol" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#2e7d32,#1b4d20)">⏻ Ligar a TV (Wake-on-LAN)</button>
@@ -188,10 +191,12 @@
 </div>
 
 <script src="lgtv.js"></script>
+<script src="voice.js"></script>
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); }, all = function (s) { return [].slice.call(document.querySelectorAll(s)); };
   var statusEl = $('#status'), dot = $('#dot'), remote = $('#remote'), muted = false, tv = null, connecting = false;
+  var appsList = [], inputsList = [];
   var NAT_W = 300, NAT_H = 812;
 
   function say(t, cls) { statusEl.textContent = t; dot.className = cls || ''; }
@@ -220,8 +225,8 @@
     tv.connect(ip).then(function () {
       connecting = false; setOn(true); say('Conectado: ' + ip, 'ok'); tv.toast('Controle conectado');
       tv.getMac().then(function (m) { if (m) store('mac', m); }).catch(function () {});
-      tv.getInputs().then(function (l) { $('#inputs').innerHTML = l.map(function (d) { return '<option value="' + d.id + '">' + (d.label || d.id) + '</option>'; }).join(''); }).catch(function () {});
-      tv.getApps().then(function (l) { $('#apps').innerHTML = l.map(function (a) { return '<option value="' + a.id + '">' + a.title + '</option>'; }).join(''); }).catch(function () {});
+      tv.getInputs().then(function (l) { inputsList = l; $('#inputs').innerHTML = l.map(function (d) { return '<option value="' + d.id + '">' + (d.label || d.id) + '</option>'; }).join(''); }).catch(function () {});
+      tv.getApps().then(function (l) { appsList = l; $('#apps').innerHTML = l.map(function (a) { return '<option value="' + a.id + '">' + a.title + '</option>'; }).join(''); }).catch(function () {});
     }).catch(function (e) { connecting = false; say(e.message, 'err'); if (autoFallback) search(); });
   }
 
@@ -301,6 +306,26 @@
   wh.addEventListener('touchstart', function (e) { wl = e.touches[0].clientY; e.preventDefault(); }, { passive: false });
   wh.addEventListener('touchmove', function (e) { if (wl === null || !tv || !tv.ready) return; var y = e.touches[0].clientY; var dy = (y - wl) * 1.5; wl = y; if (dy) tv.scroll(0, dy).catch(function () {}); e.preventDefault(); }, { passive: false });
   wh.addEventListener('touchend', function () { wl = null; });
+
+
+  /* comando de voz */
+  var mic = $('#micBtn');
+  function wakeTv() { var mac = store('mac'); if (mac && window.Native && Native.wake) { Native.wake(mac); return Promise.resolve(); } return Promise.reject(new Error('Conecte uma vez com a TV ligada para eu guardar o MAC')); }
+  mic.onclick = function () {
+    if (!(window.Native && Native.listen)) { say('Voz só funciona no APK.', 'err'); return; }
+    mic.classList.add('on'); say('🎤 Ouvindo… fale o comando', 'wait'); buzz();
+    Native.listen();
+  };
+  window.__voiceErr = function (msg) { mic.classList.remove('on'); say(msg, 'err'); };
+  window.__voice = function (alts) {
+    mic.classList.remove('on');
+    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv };
+    var cmd = Voice.pick(alts, ctx);
+    if (!cmd) { say('Não entendi: “' + alts[0] + '”', 'err'); return; }
+    if (cmd.label !== 'Ligar a TV' && !(tv && tv.ready)) { say('Sem conexão com a TV. Toque em Procurar TV.', 'err'); return; }
+    say('🎤 ' + cmd.label, 'ok');
+    cmd.run(tv, ctx).catch(function (e) { say(e.message, 'err'); });
+  };
 
   var saved = store('ip');
   if (saved) connect(saved, true); else search();
