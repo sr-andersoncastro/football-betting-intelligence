@@ -148,65 +148,27 @@
   .hud.bl { left:10px; bottom:8px; border-right:0; border-top:0; } .hud.br { right:10px; bottom:8px; border-left:0; border-top:0; }
   #vLink { position:absolute; bottom:8px; left:70px; right:70px; text-align:center; font-size:10px; letter-spacing:2px; color:#4fd1ff88; z-index:3; pointer-events:none; }
 </style>
+<link rel="stylesheet" href="design.css">
 </head>
 <body>
 
-<div id="bar"><div id="dot"></div><div id="status">Iniciando…</div><button class="pill" id="search">Procurar TV</button><button class="pill" id="ipbtn">IP</button></div>
+<header id="bar"><span class="tv-icon" aria-hidden="true">▱</span><div class="connection"><strong>LG webOS</strong><div class="connection-status"><div id="dot"></div><div id="status" role="status">Iniciando…</div></div></div><button class="pill" id="search" aria-label="Procurar TV">⌕</button><button class="pill" id="ipbtn" aria-label="Configurar conexão" title="Configurar conexão"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h3l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"/><circle cx="10.5" cy="12" r="3"/></svg></button></header>
 <div id="pop"><div class="r"><input id="ip" inputmode="decimal" placeholder="IP da TV, ex.: 192.168.0.25" autocomplete="off"><button class="pill" id="go" style="height:44px">Conectar</button></div><div id="list" style="display:grid;gap:6px"></div></div>
 
 <div id="wrap"><div id="stage">
  <div class="remote off" id="remote">
-  <div class="row">
-    <button class="key round" id="power" data-act="power">⏻</button>
-    <span class="lgmark">LG</span>
-    <button class="key round" id="inputBtn" data-more="1" title="Entradas">⎆</button>
+  <h1>Controle remoto</h1>
+  <div class="top-keys"><button class="key" id="power" data-act="power" aria-label="Desligar TV">⏻</button><button class="key" data-btn="HOME" aria-label="Início">⌂</button><button class="key" id="inputBtn" data-more="1" aria-label="Entradas">⇥</button></div>
+  <div class="navigation">
+    <div class="rocker"><button data-act="volUp" aria-label="Aumentar volume">+</button><span>VOL</span><button data-act="volDown" aria-label="Diminuir volume">−</button></div>
+    <div class="wheel"><button class="arr u" data-btn="UP" aria-label="Cima">▲</button><button class="arr d" data-btn="DOWN" aria-label="Baixo">▼</button><button class="arr l" data-btn="LEFT" aria-label="Esquerda"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="15,5 5,12 15,19" fill="currentColor"/></svg></button><button class="arr r" data-btn="RIGHT" aria-label="Direita"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="9,5 19,12 9,19" fill="currentColor"/></svg></button><button class="okk" data-btn="ENTER">OK</button></div>
+    <div class="rocker"><button data-act="chUp" aria-label="Próximo canal">⌃</button><span>CH</span><button data-act="chDown" aria-label="Canal anterior">⌄</button></div>
   </div>
+  <div class="nav3"><button class="key" data-btn="BACK" aria-label="Voltar">↶</button><button class="key" data-act="mute" aria-label="Silenciar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4 5 9H2v6h3l6 5Zm5 5 6 6m0-6-6 6"/></svg></button><button class="key" data-more="1" aria-label="Mais comandos">☰</button></div>
+  <button class="voice-action" id="voiceAction"><span class="mic-icon" aria-hidden="true"></span>Comando de voz</button>
+  <div class="brands"><button class="brand" id="netflix" data-app="netflix">NETFLIX</button><button class="brand" id="prime" data-app="amazon">Prime Video</button></div>
+  <button class="key keypad-open" id="keypadOpen"><span aria-hidden="true">⠿</span>Teclado numérico<span aria-hidden="true">›</span></button>
 
-  <div class="nums">
-    <button class="key num" data-btn="1">1</button><button class="key num" data-btn="2">2</button><button class="key num" data-btn="3">3</button>
-    <button class="key num" data-btn="4">4</button><button class="key num" data-btn="5">5</button><button class="key num" data-btn="6">6</button>
-    <button class="key num" data-btn="7">7</button><button class="key num" data-btn="8">8</button><button class="key num" data-btn="9">9</button>
-    <button class="key num" data-btn="DASH">-/--</button><button class="key num" data-btn="0">0</button><button class="key num" data-btn="LIST">☰</button>
-  </div>
-  <div class="lbls"><span></span><span>QUICK ACCESS</span><span>AD/SAP</span></div>
-
-  <div class="row" style="margin-top:8px;align-items:flex-start">
-    <div class="rocker"><button data-act="volUp">+</button><button data-act="volDown">−</button></div>
-    <div class="mid">
-      <button class="key round" data-act="mute">🔇</button>
-      <button class="key round" id="micBtn" title="Comando de voz">🎤</button>
-    </div>
-    <div class="rocker"><button data-act="chUp">⌃</button><button data-act="chDown">⌄</button></div>
-  </div>
-
-  <div class="row" style="margin-top:6px">
-    <button class="key round hg" data-btn="HOME">⌂</button>
-    <button class="key round hg" data-btn="QMENU">⚙</button>
-  </div>
-
-  <div class="wheel">
-    <button class="arr u" data-btn="UP">▲</button>
-    <button class="arr d" data-btn="DOWN">▼</button>
-    <button class="arr l" data-btn="LEFT">◀</button>
-    <button class="arr r" data-btn="RIGHT">▶</button>
-    <button class="okk" data-btn="ENTER">OK</button>
-  </div>
-
-  <div class="nav3">
-    <button class="key round" data-btn="BACK" style="width:46px;height:46px;font-size:20px">↩</button>
-    <button class="key oval" data-btn="EXIT">EXIT</button>
-    <button class="key oval" data-btn="GUIDE">GUIDE</button>
-  </div>
-
-  <div class="brands">
-    <button class="brand" id="netflix" data-app="netflix">NETFLIX</button>
-    <button class="brand" id="prime" data-app="amazon">prime video</button>
-  </div>
-
-  <div class="colors">
-    <button data-btn="RED" style="background:#e53935"></button><button data-btn="GREEN" style="background:#43a047"></button>
-    <button data-btn="YELLOW" style="background:#fdd835"></button><button data-btn="BLUE" style="background:#1e88e5"></button>
-  </div>
  </div>
 </div></div>
 
@@ -215,12 +177,13 @@
   <canvas id="gl"></canvas>
   <div class="vtop">Controle por voz</div>
   <div class="vmid">
-    <div class="orbwrap"><button class="orb" id="orb" aria-label="Falar"></button></div>
-    <div id="vState">Toque no círculo para começar</div>
+    <div class="orbwrap"><button class="orb" id="orb" aria-label="Falar"><span class="mic-icon" aria-hidden="true"></span></button></div>
+    <div id="vState">Toque para falar</div>
     <div id="vTranscript"></div>
     <div id="vResult"></div>
   </div>
-  <div>
+  <div class="voice-bottom">
+    <div class="examples"><div class="examples-title">EXEMPLOS DE COMANDO</div><div class="example"><span>▻</span>Abra a Netflix<b>›</b></div><div class="example"><span>▱</span>Coloque no canal 12<b>›</b></div><div class="example"><span>♬</span>Aumente o volume<b>›</b></div></div>
     <div id="vHist"></div>
     <div id="vHint"></div>
   </div>
@@ -233,6 +196,14 @@
 <button class="fab" id="fabMore" title="Mais comandos">☰</button>
 <button class="fab" id="fabMouse" title="Mouse">🖱</button>
 
+<nav class="bottom-tabs" aria-label="Modo do controle"><button id="controlTab" aria-label="Controle" aria-pressed="false"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="8" r="1"/><path d="M10 15h4m-2-2v4"/></svg></span>Controle</button><button id="voiceTab" aria-label="Voz" aria-pressed="false"><span class="mic-icon" aria-hidden="true"></span>Voz</button></nav>
+<div class="ov" id="keypad"><div class="ovh"><span>Teclado numérico</span><button class="key x" data-close="keypad" aria-label="Fechar teclado">✕</button></div>  <div class="nums">
+    <button class="key num" data-btn="1">1</button><button class="key num" data-btn="2">2</button><button class="key num" data-btn="3">3</button>
+    <button class="key num" data-btn="4">4</button><button class="key num" data-btn="5">5</button><button class="key num" data-btn="6">6</button>
+    <button class="key num" data-btn="7">7</button><button class="key num" data-btn="8">8</button><button class="key num" data-btn="9">9</button>
+    <button class="key num" data-btn="DASH">-/--</button><button class="key num" data-btn="0">0</button><button class="key num" data-btn="LIST">☰</button>
+  </div>
+<div class="colors"><button data-btn="RED" style="background:#e53935" aria-label="Vermelho"></button><button data-btn="GREEN" style="background:#43a047" aria-label="Verde"></button><button data-btn="YELLOW" style="background:#fdd835" aria-label="Amarelo"></button><button data-btn="BLUE" style="background:#1e88e5" aria-label="Azul"></button></div></div>
 <!-- Mouse -->
 <div class="ov" id="mouseOv">
   <div class="ovh"><span>Mouse</span><button class="key x" data-close="mouseOv">✕</button></div>
@@ -243,7 +214,7 @@
 <!-- Mais -->
 <div class="ov" id="more">
   <div class="ovh"><span>Mais comandos</span><button class="key x" data-close="more">✕</button></div>
-  <button class="key btn red" id="toVoice" style="width:100%">🎤 Modo voz (sem botões)</button>
+  <button class="key btn" id="micBtn">Ditado rápido</button><button class="key btn" id="mouseOpen">Mouse / touchpad</button><button class="key btn" data-btn="EXIT">Sair</button><button class="key btn" data-btn="GUIDE">Guia de programação</button><button class="key btn" data-btn="QMENU">Configurações da TV</button><button class="key btn red" id="toVoice" style="width:100%">🎤 Modo voz (sem botões)</button>
   <div class="lbl">Teclado — digite na tela da TV (abra antes um campo de texto nela)</div>
   <div class="g2"><input id="txt" placeholder="Digite aqui"><button class="key btn red" id="sendTxt" style="padding:0 16px">Enviar</button></div>
   <div class="g3"><button class="key btn" id="bs">⌫ Apagar</button><button class="key btn" id="enterKey">↵ Enter</button><button class="key btn" data-btn="ENTER">OK</button></div>
@@ -281,7 +252,7 @@
   var $ = function (s) { return document.querySelector(s); }, all = function (s) { return [].slice.call(document.querySelectorAll(s)); };
   var statusEl = $('#status'), dot = $('#dot'), remote = $('#remote'), muted = false, tv = null, connecting = false;
   var appsList = [], inputsList = [];
-  var NAT_W = 300, NAT_H = 812;
+
 
   function say(t, cls) { statusEl.textContent = t; dot.className = cls || ''; }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
@@ -292,10 +263,10 @@
 
   /* escala o controle para caber inteiro na tela, sem rolar */
   function fit() {
-    var availH = window.innerHeight - $('#bar').offsetHeight - 6, availW = window.innerWidth - 16;
-    var s = Math.min(availH / NAT_H, availW / NAT_W, 1.3);
-    $('#stage').style.transform = 'scale(' + s + ')';
-    var w = $('#wrap'); w.style.width = Math.round(NAT_W * s) + 'px'; w.style.height = Math.round(NAT_H * s) + 'px';
+    // O layout responde à largura e permite rolagem em telas baixas.
+    $('#stage').style.transform = '';
+    $('#wrap').style.width = '';
+    $('#wrap').style.height = '';
   }
   window.addEventListener('resize', fit); fit(); setTimeout(fit, 300);
 
@@ -338,6 +309,8 @@
   /* painéis */
   function open(id) { $('#' + id).classList.add('on'); }
   function close(id) { $('#' + id).classList.remove('on'); }
+  $('#keypadOpen').onclick = function () { open('keypad'); };
+  $('#mouseOpen').onclick = function () { close('more'); open('mouseOv'); };
   $('#fabMouse').onclick = function () { open('mouseOv'); };
   $('#fabMore').onclick = function () { open('more'); };
   all('[data-close]').forEach(function (b) { b.onclick = function () { close(b.dataset.close); }; });
@@ -442,7 +415,7 @@
   /* ===== voz: botão clássico (janela do Google) e Modo Voz (escuta contínua) ===== */
   var vs = $('#voiceScreen'), orb = $('#orb'), vState = $('#vState'), vT = $('#vTranscript'), vR = $('#vResult'), vH = $('#vHist'), vHint = $('#vHint');
   var listening = false, hist = [], flashT = null;
-  var STATES = { idle: 'Toque no círculo para começar', listening: 'Ouvindo…', hearing: 'Estou te ouvindo…', thinking: 'Entendendo…' };
+  var STATES = { idle: 'Toque para falar', listening: 'Ouvindo…', hearing: 'Estou te ouvindo…', thinking: 'Entendendo…' };
   var HINTS = ['“abrir Netflix”', '“aumentar o volume”', '“canal 5”', '“colocar desenhos do bolo fofo no YouTube”', '“mudo”', '“HDMI 1”', '“pausar”', '“voltar”', '“desligar a TV”', '“ajuda”', '“modo botões”'];
   var hi = 0;
   setInterval(function () { if (document.body.classList.contains('voice')) { vHint.textContent = 'Tente: ' + HINTS[hi++ % HINTS.length]; } }, 5000);
@@ -457,8 +430,13 @@
   function setMode(m) {
     document.body.classList.toggle('voice', m === 'voice'); store('mode', m);
     if (m !== 'voice' && listening && window.Native && Native.voiceStop) { Native.voiceStop(); }
+    $('#controlTab').setAttribute('aria-pressed', m !== 'voice');
+    $('#voiceTab').setAttribute('aria-pressed', m === 'voice');
+    if (typeof o3 !== 'undefined' && o3) setTimeout(function () { o3.resize(); }, 50);
     fit();
   }
+  $('#controlTab').onclick = function () { setMode('buttons'); };
+  $('#voiceTab').onclick = $('#voiceAction').onclick = function () { setMode('voice'); };
   function showHelp() {
     vR.className = ''; vR.innerHTML = 'Diga: volume, canal, abrir apps, YouTube, HDMI, pausar, navegação (cima, baixo, ok, voltar), desligar. Veja a lista em Mais comandos.';
     setTimeout(function () { vR.textContent = ''; }, 9000);
@@ -510,7 +488,7 @@
   } catch (e) {}
   setInterval(function () { $('#vLinkS').textContent = (tv && tv.ready) ? 'ONLINE' : 'OFFLINE'; }, 800);
 
-  setMode(store('mode') || 'voice');
+  setMode(store('mode') || 'buttons');
 
   var saved = store('ip');
   if (saved) connect(saved, true); else search();
