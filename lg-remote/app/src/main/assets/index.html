@@ -5,30 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Controle LG</title>
 <style>
-  :root { --bg:#111; --key:#2a2a2e; --key2:#3a3a40; --txt:#f2f2f2; --red:#a50034; --ok:#2e7d32; }
+  :root { --bg:#111; --key:#2a2a2e; --key2:#3a3a40; --txt:#f2f2f2; --red:#a50034; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { margin:0; background:var(--bg); color:var(--txt); font-family:system-ui,sans-serif; padding:12px 16px 24px; }
-  h1 { font-size:18px; margin:4px 0 10px; }
-  #conn { display:flex; gap:8px; margin-bottom:6px; }
-  #conn input { flex:1; padding:12px; border-radius:10px; border:1px solid #444; background:#1c1c20; color:var(--txt); font-size:16px; }
-  button { border:0; border-radius:14px; background:var(--key); color:var(--txt); font-size:18px; padding:0; height:52px; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:system-ui,sans-serif; padding:10px 14px 24px; }
+  h1 { font-size:17px; margin:2px 0 8px; }
+  #conn { display:flex; gap:8px; }
+  input, select { padding:11px; border-radius:10px; border:1px solid #444; background:#1c1c20; color:var(--txt); font-size:16px; width:100%; }
+  #conn input { flex:1; }
+  button { border:0; border-radius:12px; background:var(--key); color:var(--txt); font-size:16px; padding:0 6px; height:48px; }
   button:active { background:var(--key2); }
-  #go { padding:0 16px; background:var(--red); font-weight:600; font-size:16px; }
-  #status { font-size:14px; min-height:20px; margin:4px 0 10px; color:#ccc; }
+  #go { padding:0 14px; background:var(--red); font-weight:600; flex:none; }
+  #status { font-size:13px; min-height:18px; margin:6px 0; color:#ccc; }
   #status.ok { color:#7ddc82; } #status.err { color:#ff8a80; }
-  .grid { display:grid; gap:8px; }
-  .nums { grid-template-columns:repeat(3,1fr); margin-top:8px; }
-  .row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
-  .dpad { grid-template-columns:repeat(3,1fr); margin:14px 0 4px; }
-  .dpad button { height:64px; font-size:22px; }
-  .dpad .ok { background:var(--red); font-weight:700; }
-  .vc { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
-  .colors { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
-  .colors button { height:36px; }
-  .apps { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
-  #power { background:#7a0f10; }
-  .off { opacity:.4; pointer-events:none; }
-  #help { font-size:13px; color:#aaa; line-height:1.4; margin-top:14px; }
+  .g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+  .g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
+  .g2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  .dpad button { height:60px; font-size:20px; }
+  .ok { background:var(--red); font-weight:700; }
+  .colors button { height:32px; }
+  #tabs { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:6px 0; }
+  #tabs button { height:40px; font-size:14px; background:#1c1c20; }
+  #tabs button.on { background:var(--red); }
+  .tab { display:none; } .tab.on { display:block; }
+  #off.off { opacity:.4; pointer-events:none; }
+  #touch { height:300px; background:#1c1c20; border:1px solid #444; border-radius:14px; margin-top:8px; touch-action:none; display:flex; align-items:center; justify-content:center; color:#777; font-size:14px; text-align:center; }
+  #wheel { height:300px; width:44px; background:#1c1c20; border:1px solid #444; border-radius:14px; touch-action:none; display:flex; align-items:center; justify-content:center; color:#777; font-size:11px; writing-mode:vertical-rl; }
+  .mouse { display:flex; gap:8px; }
+  .mouse #touch { flex:1; }
+  .lbl { font-size:13px; color:#aaa; margin-top:12px; }
+  #help { font-size:12px; color:#999; line-height:1.4; margin-top:12px; }
+  input[type=range] { padding:0; }
 </style>
 </head>
 <body>
@@ -37,73 +43,139 @@
   <input id="ip" inputmode="decimal" placeholder="IP da TV, ex.: 192.168.0.25" autocomplete="off">
   <button id="go">Conectar</button>
 </div>
-<div id="status">Digite o IP da TV (Rede &gt; Conexão Wi-Fi &gt; Avançado) e toque em Conectar.</div>
+<div id="status">Digite o IP da TV e toque em Conectar.</div>
 
-<div id="pad" class="off">
-  <div class="row">
-    <button id="power" data-act="power">⏻</button>
-    <button data-act="mute">🔇</button>
-    <button data-btn="HOME">Início</button>
-  </div>
-  <div class="grid dpad">
+<div id="off" class="off">
+<div id="tabs"><button data-tab="t1" class="on">Controle</button><button data-tab="t2">Mouse</button><button data-tab="t3">Teclado</button><button data-tab="t4">Mais</button></div>
+
+<div id="t1" class="tab on">
+  <div class="g3"><button id="power" data-act="power" style="background:#7a0f10">⏻ Desligar</button><button data-act="mute">🔇 Mudo</button><button data-btn="HOME">Início</button></div>
+  <div class="g3 dpad">
     <button data-btn="MENU">Menu</button><button data-btn="UP">▲</button><button data-btn="EXIT">Sair</button>
     <button data-btn="LEFT">◀</button><button class="ok" data-btn="ENTER">OK</button><button data-btn="RIGHT">▶</button>
     <button data-btn="BACK">Voltar</button><button data-btn="DOWN">▼</button><button data-btn="INFO">Info</button>
   </div>
-  <div class="vc">
-    <button data-act="volUp">Vol +</button><button data-act="chUp">Canal +</button>
-    <button data-act="volDown">Vol −</button><button data-act="chDown">Canal −</button>
-  </div>
-  <div class="grid nums">
+  <div class="g2"><button data-act="volUp">Vol +</button><button data-act="chUp">Canal +</button><button data-act="volDown">Vol −</button><button data-act="chDown">Canal −</button></div>
+  <div class="g3">
     <button data-btn="1">1</button><button data-btn="2">2</button><button data-btn="3">3</button>
     <button data-btn="4">4</button><button data-btn="5">5</button><button data-btn="6">6</button>
     <button data-btn="7">7</button><button data-btn="8">8</button><button data-btn="9">9</button>
     <button data-btn="LIST">Lista</button><button data-btn="0">0</button><button data-btn="AD">AD/SAP</button>
   </div>
-  <div class="colors">
-    <button data-btn="RED" style="background:#c62828">&nbsp;</button><button data-btn="GREEN" style="background:#2e7d32">&nbsp;</button>
-    <button data-btn="YELLOW" style="background:#f9a825">&nbsp;</button><button data-btn="BLUE" style="background:#1565c0">&nbsp;</button>
+  <div class="g4 colors">
+    <button data-btn="RED" style="background:#c62828"></button><button data-btn="GREEN" style="background:#2e7d32"></button>
+    <button data-btn="YELLOW" style="background:#f9a825"></button><button data-btn="BLUE" style="background:#1565c0"></button>
   </div>
-  <div class="apps">
+  <div class="g4">
+    <button data-media="rewind">⏪</button><button data-media="play">▶</button><button data-media="pause">⏸</button><button data-media="fastForward">⏩</button>
+  </div>
+  <div class="g3">
     <button data-app="netflix">Netflix</button><button data-app="youtube.leanback.v4">YouTube</button><button data-app="amazon">Prime</button>
   </div>
 </div>
-<div id="help">Dica: se a TV pedir permissão, aceite na tela dela (o joystick físico embaixo da TV serve para escolher "Sim"). Para ligar a TV desligada é preciso apertar o botão físico dela.</div>
+
+<div id="t2" class="tab">
+  <div class="mouse"><div id="touch">Arraste para mover o cursor<br>Toque para clicar</div><div id="wheel">rolar</div></div>
+  <div class="g3"><button data-btn="BACK">Voltar</button><button data-btn="HOME">Início</button><button class="ok" id="clickBtn">Clique</button></div>
+</div>
+
+<div id="t3" class="tab">
+  <div class="lbl">Texto para a tela da TV (busca, senha, etc.). Antes, abra um campo de texto na TV.</div>
+  <div class="g2" style="grid-template-columns:1fr auto"><input id="txt" placeholder="Digite aqui"><button id="sendTxt" class="ok" style="padding:0 14px">Enviar</button></div>
+  <div class="g3"><button id="bs">⌫ Apagar</button><button id="enterKey">↵ Enter</button><button data-btn="ENTER">OK</button></div>
+</div>
+
+<div id="t4" class="tab">
+  <div class="lbl">Volume exato</div>
+  <input id="vol" type="range" min="0" max="100" value="10">
+  <div class="lbl">Entrada (HDMI, etc.)</div>
+  <div class="g2" style="grid-template-columns:1fr auto"><select id="inputs"></select><button id="goInput" style="padding:0 14px">Ir</button></div>
+  <div class="lbl">Abrir app</div>
+  <div class="g2" style="grid-template-columns:1fr auto"><select id="apps"></select><button id="goApp" style="padding:0 14px">Abrir</button></div>
+  <div class="g2"><button data-act="screenOff">Tela desligada</button><button data-act="screenOn">Tela ligada</button></div>
+  <div class="g2"><button data-btn="DASH">Painel</button><button data-btn="QMENU">Q.Menu</button><button data-btn="CC">Legenda</button><button data-btn="ASTERISK">*</button></div>
+  <div class="lbl">Mensagem na tela da TV</div>
+  <div class="g2" style="grid-template-columns:1fr auto"><input id="toast" placeholder="Texto"><button id="sendToast" style="padding:0 14px">Enviar</button></div>
+</div>
+</div>
+
+<button id="wol" style="width:100%;margin-top:12px;background:#1b5e20">⏻ Ligar a TV (Wake-on-LAN)</button>
+<div id="help">Se a TV pedir permissão, aceite com o joystick físico dela. Para ligar pelo app é preciso ter conectado ao menos uma vez com a TV ligada (o app guarda o endereço MAC) e a opção "Ligar por celular" da TV ativada.</div>
 
 <script src="lgtv.js"></script>
 <script>
 (function () {
-  var $ = function (s) { return document.querySelector(s); };
-  var statusEl = $('#status'), pad = $('#pad'), muted = false, tv = null;
+  var $ = function (s) { return document.querySelector(s); }, all = function (s) { return [].slice.call(document.querySelectorAll(s)); };
+  var statusEl = $('#status'), box = $('#off'), muted = false, tv = null;
   function say(t, cls) { statusEl.textContent = t; statusEl.className = cls || ''; }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
+  function guard(p) { if (p && p.catch) p.catch(function (e) { say(e.message, 'err'); }); return p; }
   $('#ip').value = store('ip') || '';
 
   $('#go').onclick = function () {
     var ip = $('#ip').value.trim();
     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { say('IP inválido. Exemplo: 192.168.0.25', 'err'); return; }
-    store('ip', ip);
-    if (tv) tv.close();
-    pad.classList.add('off');
+    store('ip', ip); if (tv) tv.close(); box.classList.add('off');
     say('Conectando… se a TV mostrar um aviso, aceite nela.');
-    tv = new LGTV({ clientKey: store('key'), onKey: function (k) { store('key', k); }, onState: function (s) { if (s === 'desconectado') { pad.classList.add('off'); } } });
-    tv.connect(ip).then(function () { pad.classList.remove('off'); say('Conectado à TV ' + ip, 'ok'); tv.toast('Controle conectado'); })
-      .catch(function (e) { say(e.message, 'err'); });
+    tv = new LGTV({ clientKey: store('key'), onKey: function (k) { store('key', k); },
+      onState: function (s) { if (s === 'desconectado') box.classList.add('off'); } });
+    tv.connect(ip).then(function () {
+      box.classList.remove('off'); say('Conectado à TV ' + ip, 'ok'); tv.toast('Controle conectado');
+      tv.getMac().then(function (m) { if (m) store('mac', m); }).catch(function () {});
+      tv.getInputs().then(function (l) { $('#inputs').innerHTML = l.map(function (d) { return '<option value="' + d.id + '">' + (d.label || d.id) + '</option>'; }).join(''); }).catch(function () {});
+      tv.getApps().then(function (l) { $('#apps').innerHTML = l.map(function (a) { return '<option value="' + a.id + '">' + a.title + '</option>'; }).join(''); }).catch(function () {});
+    }).catch(function (e) { say(e.message, 'err'); });
   };
 
-  function guard(p) { if (p && p.catch) p.catch(function (e) { say(e.message, 'err'); }); }
-  pad.addEventListener('click', function (ev) {
-    var b = ev.target.closest('button'); if (!b || !tv) return;
-    if (b.dataset.btn) return guard(tv.button(b.dataset.btn));
-    if (b.dataset.app) return guard(tv.launch(b.dataset.app));
-    var a = b.dataset.act;
-    if (a === 'volUp') guard(tv.volumeUp());
-    else if (a === 'volDown') guard(tv.volumeDown());
-    else if (a === 'chUp') guard(tv.channelUp());
-    else if (a === 'chDown') guard(tv.channelDown());
+  all('#tabs button').forEach(function (b) { b.onclick = function () {
+    all('#tabs button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    all('.tab').forEach(function (t) { t.classList.toggle('on', t.id === b.dataset.tab); });
+  }; });
+
+  box.addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b || !tv || b.dataset.tab) return;
+    var d = b.dataset;
+    if (d.btn) return guard(tv.button(d.btn));
+    if (d.app) return guard(tv.launch(d.app));
+    if (d.media) return guard(tv.media(d.media));
+    var a = d.act;
+    if (a === 'volUp') guard(tv.volumeUp()); else if (a === 'volDown') guard(tv.volumeDown());
+    else if (a === 'chUp') guard(tv.channelUp()); else if (a === 'chDown') guard(tv.channelDown());
     else if (a === 'mute') { muted = !muted; guard(tv.mute(muted)); }
     else if (a === 'power') guard(tv.powerOff());
+    else if (a === 'screenOff') guard(tv.screenOff()); else if (a === 'screenOn') guard(tv.screenOn());
   });
+
+  $('#clickBtn').onclick = function () { if (tv) guard(tv.click()); };
+  $('#sendTxt').onclick = function () { var t = $('#txt').value; if (tv && t) guard(tv.type(t)).then(function () { $('#txt').value = ''; }); };
+  $('#bs').onclick = function () { if (tv) guard(tv.backspace(1)); };
+  $('#enterKey').onclick = function () { if (tv) guard(tv.enterKey()); };
+  $('#goInput').onclick = function () { if (tv && $('#inputs').value) guard(tv.setInput($('#inputs').value)); };
+  $('#goApp').onclick = function () { if (tv && $('#apps').value) guard(tv.launch($('#apps').value)); };
+  $('#sendToast').onclick = function () { var t = $('#toast').value; if (tv && t) guard(tv.toast(t)); };
+  var vt = null; $('#vol').oninput = function () { var v = +this.value; clearTimeout(vt); vt = setTimeout(function () { if (tv) guard(tv.setVolume(v)); }, 150); };
+
+  $('#wol').onclick = function () {
+    var mac = store('mac');
+    if (!mac) { say('Conecte uma vez com a TV ligada para o app guardar o MAC dela.', 'err'); return; }
+    if (window.Native && Native.wake) { Native.wake(mac); say('Pedido de ligar enviado (' + mac + '). Pode levar alguns segundos.', 'ok'); }
+    else say('Wake-on-LAN só funciona no APK.', 'err');
+  };
+
+  /* Touchpad: arrastar move, toque rápido clica; faixa lateral rola. */
+  var pad = $('#touch'), last = null, t0 = 0, moved = 0, GAIN = 2.2;
+  pad.addEventListener('touchstart', function (e) { var t = e.touches[0]; last = { x: t.clientX, y: t.clientY }; t0 = Date.now(); moved = 0; e.preventDefault(); }, { passive: false });
+  pad.addEventListener('touchmove', function (e) {
+    if (!last || !tv) return; var t = e.touches[0];
+    var dx = (t.clientX - last.x) * GAIN, dy = (t.clientY - last.y) * GAIN;
+    last = { x: t.clientX, y: t.clientY }; moved += Math.abs(dx) + Math.abs(dy);
+    if (dx || dy) tv.move(dx, dy).catch(function () {}); e.preventDefault();
+  }, { passive: false });
+  pad.addEventListener('touchend', function () { if (tv && Date.now() - t0 < 250 && moved < 12) guard(tv.click()); last = null; });
+  var wh = $('#wheel'), wl = null;
+  wh.addEventListener('touchstart', function (e) { wl = e.touches[0].clientY; e.preventDefault(); }, { passive: false });
+  wh.addEventListener('touchmove', function (e) { if (wl === null || !tv) return; var y = e.touches[0].clientY; var dy = (y - wl) * 1.5; wl = y; if (dy) tv.scroll(0, dy).catch(function () {}); e.preventDefault(); }, { passive: false });
+  wh.addEventListener('touchend', function () { wl = null; });
 })();
 </script>
 </body>
