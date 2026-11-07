@@ -180,6 +180,36 @@ public class MainActivity extends Activity {
         }
 
 
+
+        /** Acha o id de um título da Netflix (busca na web, sem chave). Resposta em window.__nfResults([ids]) ou __nfErr(msg). */
+        @JavascriptInterface
+        public void nfSearch(final String query) {
+            new Thread(new Runnable() { @Override public void run() {
+                String out;
+                try {
+                    URL u = new URL("https://html.duckduckgo.com/html/?q=" + URLEncoder.encode("site:netflix.com/title " + query, "UTF-8"));
+                    HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(10000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36");
+                    c.setRequestProperty("Accept-Language", "pt-BR,pt;q=0.9");
+                    InputStream in = c.getInputStream();
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    byte[] buf = new byte[16384]; int n; int total = 0;
+                    while ((n = in.read(buf)) > 0 && total < 2000000) { bo.write(buf, 0, n); total += n; }
+                    in.close();
+                    java.util.List<String> ids = YtParser.netflixIds(bo.toString("UTF-8"), 5);
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < ids.size(); i++) { if (i > 0) sb.append(','); sb.append('"').append(ids.get(i)).append('"'); }
+                    sb.append(']');
+                    out = ids.isEmpty() ? "window.__nfErr && window.__nfErr('Não achei esse título na Netflix')" : "window.__nfResults && window.__nfResults(" + sb + ")";
+                } catch (Exception e) {
+                    out = "window.__nfErr && window.__nfErr('Não consegui buscar o título (sem internet no celular?)')";
+                }
+                final String code = out;
+                runOnUiThread(new Runnable() { @Override public void run() { js(code); } });
+            } }).start();
+        }
+
         /** Escuta contínua (sem janela do Google). Resultados em window.__voice / __voicePartial / __voiceState. */
         @JavascriptInterface
         public void voiceStart() {

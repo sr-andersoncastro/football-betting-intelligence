@@ -265,7 +265,7 @@
   <div class="g2"><select id="apps"></select><button class="key btn" id="goApp" style="padding:0 16px">Abrir</button></div>
   <div class="gg"><button class="key btn" data-act="screenOff">Tela apagada</button><button class="key btn" data-act="screenOn">Tela acesa</button></div>
   <div class="g4"><button class="key btn" data-btn="INFO">Info</button><button class="key btn" data-btn="MENU">Menu</button><button class="key btn" data-btn="CC">Legenda</button><button class="key btn" data-btn="ASTERISK">✱</button></div>
-  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “colocar desenhos do bolo fofo no YouTube”, “HDMI 1”, “aumentar o brilho”, “brilho 40”, “modo cinema”, “som no Bluetooth”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
+  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “colocar desenhos do bolo fofo no YouTube”, “abrir Stranger Things na Netflix”, “HDMI 1”, “aumentar o brilho”, “brilho 40”, “modo cinema”, “som no Bluetooth”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
   <div class="lbl">Mensagem na tela da TV</div>
   <div class="g2"><input id="toast" placeholder="Texto"><button class="key btn" id="sendToast" style="padding:0 16px">Enviar</button></div>
   <button class="key btn" id="wol" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#2e7d32,#1b4d20)">⏻ Ligar a TV (Wake-on-LAN)</button>
@@ -422,6 +422,15 @@
     ytSearch(q).catch(function (e) { say(e.message, 'err'); });
   };
 
+  /* Netflix: acha o título na web, abre direto no app da TV */
+  var nfWait = null;
+  function netflixSearch(q) {
+    if (!(window.Native && Native.nfSearch)) return Promise.reject(new Error('Busca na Netflix só funciona no APK'));
+    return new Promise(function (resolve, reject) { nfWait = { resolve: resolve, reject: reject }; Native.nfSearch(q); });
+  }
+  window.__nfResults = function (ids) { var w = nfWait; nfWait = null; if (!w) return; if (!tv || !tv.ready) { w.reject(new Error('Sem conexão com a TV')); return; } tv.playNetflix(ids[0]).then(w.resolve, w.reject); };
+  window.__nfErr = function (msg) { var w = nfWait; nfWait = null; say(msg, 'err'); if (w) w.reject(new Error(msg)); };
+
   /* comando de voz */
   var mic = $('#micBtn');
   function wakeTv() { var mac = store('mac'); if (mac && window.Native && Native.wake) { Native.wake(mac); return Promise.resolve(); } return Promise.reject(new Error('Conecte uma vez com a TV ligada para eu guardar o MAC')); }
@@ -476,7 +485,7 @@
   window.__voice = function (alts) {
     mic.classList.remove('on');
     vT.textContent = '“' + alts[0] + '”';
-    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv, ytSearch: ytSearch, setMode: setMode, search: search, help: showHelp };
+    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv, ytSearch: ytSearch, netflixSearch: netflixSearch, setMode: setMode, search: search, help: showHelp };
     var cmd = Voice.pick(alts, ctx);
     if (!cmd) { vR.className = 'err'; vR.textContent = 'Não entendi'; pushHist(alts[0], false); flash('err'); say('Não entendi: “' + alts[0] + '”', 'err'); return; }
     if (!cmd.local && cmd.label !== 'Ligar a TV' && !(tv && tv.ready)) { vR.className = 'err'; vR.textContent = 'Sem conexão com a TV'; pushHist(cmd.label, false); flash('err'); say('Sem conexão com a TV. Toque em Procurar TV.', 'err'); return; }

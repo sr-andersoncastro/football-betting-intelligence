@@ -103,6 +103,12 @@
       });
     }
 
+    // Netflix: "abrir Stranger Things na Netflix", "colocar o filme X na netflix", "netflix X"
+    var nq = null;
+    if ((m = t.match(/^(?:pesquisar|pesquisa|buscar|busca|procurar|procura|colocar|coloca|botar|bota|tocar|toca|passar|passa|ver|assistir|assiste|quero ver|quero assistir|abrir|abre|abra|mostrar|mostra|me mostra|reproduzir)\s+(?:o |a |os |as |um |uma )?(?:filme |serie |series |documentario |novela )?(?:o |a )?(.+?)\s+(?:no|na|pela|pelo|em|da|do) netflix$/))) nq = m[1];
+    else if ((m = t.match(/^netflix\s+(?:pesquisar |buscar |procurar |colocar |tocar |ver |assistir )?(?:o |a )?(?:filme |serie )?(.+)/)) && !/^(abrir|abre|aberto)$/.test(m[1])) nq = m[1];
+    if (nq) { nq = nq.trim(); return act('Netflix: ' + nq, function (tv, c) { return c.netflixSearch ? c.netflixSearch(nq) : Promise.reject(new Error('Busca na Netflix só funciona no APK')); }); }
+
     // YouTube: "colocar desenhos do bolo fofo no youtube", "youtube bolo fofo", "assistir bolo fofo"
     var q = null;
     if ((m = t.match(/^(?:pesquisar|pesquisa|buscar|busca|procurar|procura|colocar|coloca|botar|bota|tocar|toca|passar|passa|ver|assistir|assiste|quero ver|quero assistir|abrir|abre|abra|mostrar|mostra|me mostra)\s+(?:o |a |os |as |um |uma |uns |umas )?(.+?)\s+(?:no|na|do|pelo) youtube$/))) q = m[1];

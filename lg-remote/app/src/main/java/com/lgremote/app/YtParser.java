@@ -31,6 +31,15 @@ public final class YtParser {
         return out;
     }
 
+    /** Ids de títulos da Netflix em uma página de resultados (links diretos ou codificados). */
+    public static List<String> netflixIds(String html, int max) {
+        List<String> out = new ArrayList<String>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("netflix\\.com(?:%2F|/)(?:[a-z]{2}(?:-[a-z]{2})?(?:%2F|/))?(?:title|watch)(?:%2F|/)(\\d{6,9})").matcher(html);
+        while (m.find() && out.size() < max) if (!out.contains(m.group(1))) out.add(m.group(1));
+        return out;
+    }
+
     /** Lê uma string JSON a partir de start (logo após a aspa de abertura) e a desescapa. */
     static String readJsonString(String s, int start) {
         StringBuilder b = new StringBuilder();
