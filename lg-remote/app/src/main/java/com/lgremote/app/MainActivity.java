@@ -4,7 +4,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.graphics.Color;
+import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -144,7 +148,18 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(false);
         web.addJavascriptInterface(new Native(), "Native");
-        setContentView(web);
+        web.setBackgroundColor(Color.parseColor("#050506"));
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.parseColor("#050506"));
+        root.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        /* Android 15+ desenha sob as barras do sistema: reserva o espaço delas */
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override public WindowInsets onApplyWindowInsets(View v, WindowInsets in) {
+                v.setPadding(in.getSystemWindowInsetLeft(), in.getSystemWindowInsetTop(), in.getSystemWindowInsetRight(), in.getSystemWindowInsetBottom());
+                return in;
+            }
+        });
+        setContentView(root);
         web.loadUrl("file:///android_asset/index.html");
     }
 }
