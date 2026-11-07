@@ -2,7 +2,7 @@
 
 App Android que controla TVs LG webOS pela rede Wi-Fi local. Nada é instalado na TV.
 
-Uso: celular e TV na mesma rede, digite o IP da TV (Rede > Conexão Wi-Fi > Avançado), toque em Conectar e aceite o aviso na TV.
+Uso: celular e TV na mesma rede; ao abrir, o app procura a TV sozinho (SSDP, ou varredura da sub-rede na porta 3000) e conecta; aceite o aviso na TV. Botão IP permite digitar manualmente.
 
 Abas: Controle (setas, OK, voltar, início, menu, números, cores, volume, canal, mudo, mídia, apps), Mouse (touchpad com clique e rolagem), Teclado (texto na TV), Mais (volume exato, entradas HDMI, lista de apps, tela off/on, mensagem). Botão Ligar usa Wake-on-LAN.
 

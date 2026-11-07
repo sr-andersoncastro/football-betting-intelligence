@@ -28,10 +28,12 @@
       try { ws = new self.WS('ws://' + ip + ':' + self.port); } catch (e) { return reject(e); }
       self.ws = ws;
       var timer = setTimeout(function () { fail(new Error('Tempo esgotado: a TV não respondeu em ' + ip)); }, 60000);
-      function fail(err) { if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch (e) {} reject(err); }
+      var openTimer = setTimeout(function () { fail(new Error('A TV não respondeu em ' + ip + '. IP mudou ou TV desligada?')); }, 6000);
+      function fail(err) { clearTimeout(openTimer); if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch (e) {} reject(err); }
       ws.onerror = function () { fail(new Error('Não consegui falar com a TV em ' + ip + '. Confira o IP e se celular e TV estão na mesma rede.')); };
       ws.onclose = function () { self.ready = false; self.onState('desconectado'); fail(new Error('Conexão fechada')); };
       ws.onopen = function () {
+        clearTimeout(openTimer);
         self.onState('aguardando permissão na TV');
         var payload = { forcePairing: false, pairingType: 'PROMPT', manifest: { manifestVersion: 1, appVersion: '1.0', permissions: PERMISSIONS } };
         if (self.clientKey) payload['client-key'] = self.clientKey;
