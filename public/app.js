@@ -265,7 +265,9 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')fab(false);}
 const syncTabs=()=>{for(const link of document.querySelectorAll('.tabbar a'))link.classList.toggle('active',link.getAttribute('href')===(location.hash||'#matches'));};
 window.addEventListener('hashchange',syncTabs);syncTabs();
 $('competition').addEventListener('input',()=>{seasons();visible=50;render();});
-for(const id of ['season','status','search','period'])$(id).addEventListener('input',()=>{visible=50;render();});
+for(const id of ['season','status','period'])$(id).addEventListener('input',()=>{visible=50;render();});
+let searchTimer;
+$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{visible=50;render();},300);});
 $('more').addEventListener('click',()=>{visible+=50;render();});
 $('export').addEventListener('click',()=>{
   const safe=value=>'"'+String(value??'').replace(/^(\s*[=+@\-])/u,"'$1").replaceAll('"','""')+'"';
