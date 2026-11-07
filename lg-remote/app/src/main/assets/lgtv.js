@@ -125,6 +125,17 @@
       return (r.wifiInfo && r.wifiInfo.macAddress) || (r.wiredInfo && r.wiredInfo.macAddress) || null;
     });
   };
+  /* Ajustes da TV (imagem/som). Podem ser recusados conforme o modelo/firmware. */
+  LGTV.prototype.getSettings = function (category, keys) { return this.request('ssap://settings/getSystemSettings', { category: category, keys: keys }).then(function (r) { return r.settings || {}; }); };
+  LGTV.prototype.setSettings = function (category, settings) { return this.request('ssap://settings/setSystemSettings', { category: category, settings: settings }); };
+  LGTV.prototype.adjust = function (category, key, delta) {
+    var self = this;
+    return self.getSettings(category, [key]).then(function (s) {
+      var v = Math.max(0, Math.min(100, (parseInt(s[key], 10) || 0) + delta)), o = {}; o[key] = v;
+      return self.setSettings(category, o).then(function () { return v; });
+    });
+  };
+  LGTV.prototype.soundOutput = function (out) { return this.request('ssap://audio/changeSoundOutput', { output: out }); };
   LGTV.prototype.close = function () { try { this.ws && this.ws.close(); this.pointer && this.pointer.close(); } catch (e) {} };
 
   LGTV.PERMISSIONS = PERMISSIONS;

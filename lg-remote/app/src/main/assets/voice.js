@@ -54,6 +54,25 @@
     if (/volume (minimo|no minimo|zero)/.test(t)) return act('Volume 0', function (tv) { return tv.setVolume(0); });
     if (/volume (na metade|medio|normal)/.test(t)) return act('Volume 50', function (tv) { return tv.setVolume(50); });
 
+    // ajustes de imagem
+    var SET = [[/(brilho|luz de fundo|luminosidade)/, 'backlight', 'Brilho'], [/contraste/, 'contrast', 'Contraste']];
+    for (var si = 0; si < SET.length; si++) {
+      if (!SET[si][0].test(t)) continue;
+      var key = SET[si][1], nm = SET[si][2], step = 10 * n;
+      if (/(aument|mais|sobe|subir|elev|maior|acima)/.test(t)) return act(nm + ' +', function (tv) { return tv.adjust('picture', key, step); });
+      if (/(diminu|menos|baix|reduz|abaix|menor|escur)/.test(t)) return act(nm + ' −', function (tv) { return tv.adjust('picture', key, -step); });
+      if (/(maximo|no maximo)/.test(t)) return act(nm + ' máximo', function (tv) { return tv.setSettings('picture', (function () { var o = {}; o[key] = 100; return o; })()); });
+      if (/(minimo|no minimo)/.test(t)) return act(nm + ' mínimo', function (tv) { return tv.setSettings('picture', (function () { var o = {}; o[key] = 0; return o; })()); });
+      var nv = num(t.replace(SET[si][0], ' '));
+      if (nv !== null) { nv = Math.max(0, Math.min(100, nv)); return act(nm + ' ' + nv, function (tv) { return tv.setSettings('picture', (function () { var o = {}; o[key] = nv; return o; })()); }); }
+    }
+    var PM = { cinema: 'cinema', jogo: 'game', jogos: 'game', vivido: 'vivid', padrao: 'standard', esporte: 'sports', esportes: 'sports', economia: 'eco', eco: 'eco' };
+    if ((m = t.match(/modo (?:de )?(?:imagem )?(cinema|jogos?|vivido|padrao|esportes?|economia|eco)$/))) { var pm = PM[m[1]]; return act('Modo ' + m[1], function (tv) { return tv.setSettings('picture', { pictureMode: pm }); }); }
+    // saída de som / bluetooth
+    if (/(som|audio|saida).*bluetooth|bluetooth.*(som|audio|caixa|fone)/.test(t) && !/(ligar|desligar|ativar|desativar|liga|desliga)\s+(o\s+)?bluetooth$/.test(t)) return act('Som no Bluetooth', function (tv) { return tv.soundOutput('bt_soundbar'); });
+    if (/(alto falantes?|caixas?|som) da tv/.test(t) && /(usar|trocar|voltar|colocar|mudar|saida|ligar|ativar|passar)/.test(t)) return act('Som da TV', function (tv) { return tv.soundOutput('tv_speaker'); });
+    if (/(ligar|desligar|ativar|desativar|liga|desliga)\s+(o\s+)?bluetooth/.test(t)) return act('Bluetooth: abrindo configurações', function (tv) { return tv.launch('com.palm.app.settings').then(function () { throw new Error('A LG não deixa ligar/desligar o Bluetooth por comando. Abri as configurações da TV.'); }); });
+
     // desligar / ligar
     if (/^(desligar|desliga|apagar|apaga)( a| essa| esta)?( tv| televisao)?$/.test(t) || /^(desligar|desliga) (tudo|a tv|a televisao)/.test(t)) return act('Desligar a TV', function (tv) { return tv.powerOff(); });
     if (/^(ligar|liga|acordar)( a| essa)?( tv| televisao)?$/.test(t)) return act('Ligar a TV', function (tv, c) { return c.wake ? c.wake() : Promise.reject(new Error('Não sei o MAC da TV')); });

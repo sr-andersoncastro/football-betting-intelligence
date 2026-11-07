@@ -254,13 +254,18 @@
   <div class="g2"><input id="ytq" placeholder="ex.: desenhos do bolo fofo"><button class="key btn red" id="ytGo" style="padding:0 16px">Tocar</button></div>
   <div class="lbl">Volume exato</div>
   <input id="vol" type="range" min="0" max="100" value="10">
+  <div class="lbl">Brilho (luz de fundo)</div>
+  <input id="bri" type="range" min="0" max="100" value="50">
+  <div class="lbl">Contraste</div>
+  <input id="con" type="range" min="0" max="100" value="80">
+  <div class="gg"><button class="key btn" id="btOut">Som no Bluetooth</button><button class="key btn" id="tvOut">Som da TV</button></div>
   <div class="lbl">Entrada (HDMI etc.)</div>
   <div class="g2"><select id="inputs"></select><button class="key btn" id="goInput" style="padding:0 16px">Ir</button></div>
   <div class="lbl">Abrir app</div>
   <div class="g2"><select id="apps"></select><button class="key btn" id="goApp" style="padding:0 16px">Abrir</button></div>
   <div class="gg"><button class="key btn" data-act="screenOff">Tela apagada</button><button class="key btn" data-act="screenOn">Tela acesa</button></div>
   <div class="g4"><button class="key btn" data-btn="INFO">Info</button><button class="key btn" data-btn="MENU">Menu</button><button class="key btn" data-btn="CC">Legenda</button><button class="key btn" data-btn="ASTERISK">✱</button></div>
-  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “colocar desenhos do bolo fofo no YouTube”, “HDMI 1”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
+  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “colocar desenhos do bolo fofo no YouTube”, “HDMI 1”, “aumentar o brilho”, “brilho 40”, “modo cinema”, “som no Bluetooth”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
   <div class="lbl">Mensagem na tela da TV</div>
   <div class="g2"><input id="toast" placeholder="Texto"><button class="key btn" id="sendToast" style="padding:0 16px">Enviar</button></div>
   <button class="key btn" id="wol" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#2e7d32,#1b4d20)">⏻ Ligar a TV (Wake-on-LAN)</button>
@@ -364,6 +369,10 @@
   $('#goApp').onclick = function () { if (tv && $('#apps').value) guard(tv.launch($('#apps').value)); };
   $('#sendToast').onclick = function () { var t = $('#toast').value; if (tv && t) guard(tv.toast(t)); };
   var vt = null; $('#vol').oninput = function () { var v = +this.value; clearTimeout(vt); vt = setTimeout(function () { if (tv) guard(tv.setVolume(v)); }, 150); };
+  var st1 = null; function slider(id, key) { $(id).oninput = function () { var v = +this.value; clearTimeout(st1); st1 = setTimeout(function () { if (tv && tv.ready) { var o = {}; o[key] = v; guard(tv.setSettings('picture', o)); } }, 200); }; }
+  slider('#bri', 'backlight'); slider('#con', 'contrast');
+  $('#btOut').onclick = function () { if (tv && tv.ready) guard(tv.soundOutput('bt_soundbar')); };
+  $('#tvOut').onclick = function () { if (tv && tv.ready) guard(tv.soundOutput('tv_speaker')); };
   $('#wol').onclick = function () {
     var mac = store('mac');
     if (!mac) { say('Conecte uma vez com a TV ligada para o app guardar o MAC dela.', 'err'); close('more'); return; }
