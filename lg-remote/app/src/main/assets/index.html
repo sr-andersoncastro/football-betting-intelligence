@@ -23,8 +23,8 @@
 
   /* palco: o controle é desenhado em 270x816 e escalado para caber na tela */
   #wrap { position:relative; margin:0 auto; }
-  #stage { position:absolute; left:0; top:0; width:270px; height:842px; transform-origin:0 0; }
-  .remote { position:relative; width:270px; height:842px; padding:18px 20px 0; border-radius:64px 64px 70px 70px;
+  #stage { position:absolute; left:0; top:0; width:300px; height:812px; transform-origin:0 0; }
+  .remote { position:relative; width:300px; height:812px; padding:14px 24px 0; border-radius:70px 70px 76px 76px;
     background:
       linear-gradient(90deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 7%, rgba(255,255,255,0) 93%, rgba(255,255,255,.07) 100%),
       linear-gradient(180deg,#242428 0%,#0d0d0f 18%,#070708 100%);
@@ -35,39 +35,38 @@
   .key:active { background:linear-gradient(180deg,#121215,#2b2b30); transform:translateY(1px); }
   .round { border-radius:50%; }
   .row { display:flex; justify-content:space-between; align-items:center; }
-  #power { width:46px; height:46px; color:#ff2a4f; font-size:24px; border-color:#4d1a25; }
-  #inputBtn { width:38px; height:38px; font-size:17px; }
-  .nums { display:grid; grid-template-columns:repeat(3,1fr); gap:8px 9px; margin-top:14px; }
-  .num { height:35px; border-radius:11px; font-size:19px; font-weight:500; }
-  .lbls { display:grid; grid-template-columns:repeat(3,1fr); font-size:7.5px; letter-spacing:.4px; color:var(--dim); text-align:center; height:12px; margin-top:3px; }
-  .rocker { width:44px; height:102px; border-radius:22px; display:flex; flex-direction:column; justify-content:space-between;
+  #power { width:50px; height:50px; color:#ff2a4f; font-size:24px; border-color:#4d1a25; }
+  #inputBtn { width:44px; height:44px; font-size:17px; }
+  .nums { display:grid; grid-template-columns:repeat(3,1fr); gap:6px 10px; margin-top:8px; }
+  .num { height:39px; border-radius:12px; font-size:21px; font-weight:500; }
+  .lbls { display:grid; grid-template-columns:repeat(3,1fr); font-size:7.5px; letter-spacing:.4px; color:var(--dim); text-align:center; height:11px; margin-top:3px; }
+  .rocker { width:52px; height:108px; border-radius:26px; display:flex; flex-direction:column; justify-content:space-between;
     background:linear-gradient(180deg,#2b2b30,#121215); border:1px solid #333339; box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 2px 3px rgba(0,0,0,.7); overflow:hidden; }
-  .rocker button { flex:1; background:transparent; border:0; color:#e4e4e8; font-size:24px; padding:0; }
+  .rocker button { flex:1; background:transparent; border:0; color:#e4e4e8; font-size:27px; padding:0; }
   .rocker button:active { background:rgba(255,255,255,.12); }
-  .mid { display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .mid .key { width:40px; height:40px; font-size:15px; }
-  .hg { width:40px; height:40px; font-size:17px; }
+  .mid { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .mid .key { width:50px; height:50px; font-size:19px; }
+  .hg { width:46px; height:46px; font-size:20px; }
 
   /* aro de setas */
-  .wheel { position:relative; width:214px; height:214px; margin:14px auto 0; border-radius:50%;
+  .wheel { position:relative; width:230px; height:230px; margin:8px auto 0; border-radius:50%;
     background:radial-gradient(circle at 50% 28%, #34343a 0%, #17171a 62%, #0e0e10 100%); border:1px solid #3a3a40;
     box-shadow:inset 0 2px 6px rgba(255,255,255,.1), 0 4px 10px rgba(0,0,0,.7); }
-  .arr { position:absolute; width:56px; height:56px; background:transparent; border:0; color:#d8d8dc; font-size:18px; padding:0; border-radius:50%; }
+  .arr { position:absolute; width:62px; height:62px; background:transparent; border:0; color:#d8d8dc; font-size:18px; padding:0; border-radius:50%; }
   .arr:active { background:rgba(255,255,255,.12); }
-  .u { top:5px; left:79px; } .d { bottom:5px; left:79px; } .l { left:5px; top:79px; } .r { right:5px; top:79px; }
-  .okk { position:absolute; top:57px; left:57px; width:98px; height:98px; border-radius:50%; border:1px solid #46464d; color:#eee; font-size:19px; font-weight:600;
+  .u { top:5px; left:84px; } .d { bottom:5px; left:84px; } .l { left:5px; top:84px; } .r { right:5px; top:84px; }
+  .okk { position:absolute; top:62px; left:62px; width:106px; height:106px; border-radius:50%; border:1px solid #46464d; color:#eee; font-size:19px; font-weight:600;
     background:radial-gradient(circle at 50% 28%, #3c3c42, #0c0c0e); letter-spacing:1px; }
   .okk:active { background:radial-gradient(circle at 50% 28%, #0c0c0e, #3c3c42); }
-  .nav3 { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
-  .oval { width:62px; height:32px; border-radius:16px; font-size:10px; font-weight:700; letter-spacing:.5px; }
-  .brands { display:flex; gap:10px; margin-top:10px; }
-  .brand { flex:1; height:34px; border-radius:10px; font-size:11px; font-weight:800; border:0; color:#fff; font-family:inherit; }
+  .nav3 { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .oval { width:74px; height:38px; border-radius:19px; font-size:11px; font-weight:700; letter-spacing:.5px; }
+  .brands { display:flex; gap:10px; margin-top:8px; }
+  .brand { flex:1; height:40px; border-radius:11px; font-size:12px; font-weight:800; border:0; color:#fff; font-family:inherit; }
   #netflix { background:#e50914; }
-  #prime { background:#0c1b2a; color:#1fb4ff; border:1px solid #1d3a56; font-size:10px; }
-  .colors { display:flex; gap:10px; justify-content:center; margin-top:14px; }
-  .colors button { width:40px; height:13px; border-radius:7px; border:0; padding:0; box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px #000; }
-  .logo { position:absolute; left:0; right:0; bottom:16px; text-align:center; font-weight:800; font-size:15px; color:#cfcfd4; letter-spacing:1px; }
-  .logo span { display:inline-block; width:28px; height:28px; line-height:27px; border-radius:50%; background:#a50034; color:#fff; font-size:11px; }
+  #prime { background:#0c1b2a; color:#1fb4ff; border:1px solid #1d3a56; font-size:11px; }
+  .colors { display:flex; gap:10px; justify-content:center; margin-top:10px; }
+  .colors button { width:46px; height:15px; border-radius:8px; border:0; padding:0; box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px #000; }
+  .lgmark { width:30px; height:30px; line-height:29px; text-align:center; border-radius:50%; background:#a50034; color:#fff; font-weight:800; font-size:12px; letter-spacing:.5px; }
 
   /* botões flutuantes */
   .fab { position:fixed; z-index:20; width:46px; height:46px; border-radius:50%; border:1px solid #3a3a42; background:rgba(28,28,33,.92); color:#fff; font-size:20px; padding:0;
@@ -103,6 +102,7 @@
  <div class="remote off" id="remote">
   <div class="row">
     <button class="key round" id="power" data-act="power">⏻</button>
+    <span class="lgmark">LG</span>
     <button class="key round" id="inputBtn" data-more="1" title="Entradas">⎆</button>
   </div>
 
@@ -123,7 +123,7 @@
     <div class="rocker"><button data-act="chUp">⌃</button><button data-act="chDown">⌄</button></div>
   </div>
 
-  <div class="row" style="margin-top:12px">
+  <div class="row" style="margin-top:6px">
     <button class="key round hg" data-btn="HOME">⌂</button>
     <button class="key round hg" data-btn="QMENU">⚙</button>
   </div>
@@ -137,7 +137,7 @@
   </div>
 
   <div class="nav3">
-    <button class="key round" data-btn="BACK" style="width:40px;height:40px;font-size:17px">↩</button>
+    <button class="key round" data-btn="BACK" style="width:46px;height:46px;font-size:20px">↩</button>
     <button class="key oval" data-btn="EXIT">EXIT</button>
     <button class="key oval" data-btn="GUIDE">GUIDE</button>
   </div>
@@ -151,7 +151,6 @@
     <button data-btn="RED" style="background:#e53935"></button><button data-btn="GREEN" style="background:#43a047"></button>
     <button data-btn="YELLOW" style="background:#fdd835"></button><button data-btn="BLUE" style="background:#1e88e5"></button>
   </div>
-  <div class="logo"><span>LG</span></div>
  </div>
 </div></div>
 
@@ -193,7 +192,7 @@
 (function () {
   var $ = function (s) { return document.querySelector(s); }, all = function (s) { return [].slice.call(document.querySelectorAll(s)); };
   var statusEl = $('#status'), dot = $('#dot'), remote = $('#remote'), muted = false, tv = null, connecting = false;
-  var NAT_W = 270, NAT_H = 842;
+  var NAT_W = 300, NAT_H = 812;
 
   function say(t, cls) { statusEl.textContent = t; dot.className = cls || ''; }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
@@ -216,7 +215,7 @@
     store('ip', ip); $('#ip').value = ip; $('#list').innerHTML = ''; $('#pop').classList.remove('on');
     if (tv) tv.close(); setOn(false);
     say('Conectando a ' + ip + '… aceite o aviso na TV', 'wait');
-    tv = new LGTV({ clientKey: store('key'), onKey: function (k) { store('key', k); },
+    tv = new LGTV({ clientKey: store('key2'), onKey: function (k) { store('key2', k); },
       onState: function (s) { if (s === 'desconectado') { setOn(false); say('Desconectado — toque em Procurar TV', 'err'); } } });
     tv.connect(ip).then(function () {
       connecting = false; setOn(true); say('Conectado: ' + ip, 'ok'); tv.toast('Controle conectado');
