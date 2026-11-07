@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     private SpeechRecognizer sr;
     private boolean continuous = false;
     private int errorStreak = 0;
+    private long lastRms = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private void startListening() {
@@ -71,7 +72,10 @@ public class MainActivity extends Activity {
     private final RecognitionListener listener = new RecognitionListener() {
         @Override public void onReadyForSpeech(Bundle b) { js("window.__voiceState && window.__voiceState('listening')"); }
         @Override public void onBeginningOfSpeech() { js("window.__voiceState && window.__voiceState('hearing')"); }
-        @Override public void onRmsChanged(float v) { }
+        @Override public void onRmsChanged(float v) {
+            long now = System.currentTimeMillis();
+            if (now - lastRms > 70) { lastRms = now; js("window.__rms && window.__rms(" + v + ")"); }
+        }
         @Override public void onBufferReceived(byte[] b) { }
         @Override public void onEndOfSpeech() { js("window.__voiceState && window.__voiceState('thinking')"); }
         @Override public void onEvent(int t, Bundle b) { }

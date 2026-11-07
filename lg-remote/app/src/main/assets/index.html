@@ -125,6 +125,28 @@
   #vHint { font-size:12px; color:#5d7186; text-align:center; min-height:16px; }
   .mini { position:absolute; bottom:18px; width:40px; height:40px; border-radius:50%; border:1px solid #1c2a3a; background:rgba(12,20,32,.8); color:#5d7186; font-size:17px; padding:0; }
   #toClassic { left:16px; } #vSearch { right:16px; }
+
+  /* ===== visual 3D ===== */
+  #gl { position:absolute; left:0; top:0; width:100%; height:100%; z-index:0; pointer-events:none; display:none; }
+  #voiceScreen.gl #gl { display:block; }
+  #voiceScreen > :not(canvas) { position:relative; z-index:1; }
+  #voiceScreen > .mini, #voiceScreen > .hud, #voiceScreen > #vLink { position:absolute; }
+  #voiceScreen.gl .orbwrap { width:260px; height:260px; }
+  #voiceScreen.gl .orb { width:240px; height:240px; background:none; box-shadow:none; animation:none; filter:none !important; -webkit-tap-highlight-color:transparent; outline:none; }
+  #voiceScreen.gl .orb::before, #voiceScreen.gl .orb::after { display:none; }
+  #voiceScreen { background:radial-gradient(ellipse at 50% 36%, #0b1630 0%, #050813 55%, #020308 100%); font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  #voiceScreen.gl::before { content:""; position:absolute; left:0; right:0; top:0; bottom:0; pointer-events:none; z-index:2; opacity:.35;
+    background:repeating-linear-gradient(0deg, rgba(79,209,255,.05) 0, rgba(79,209,255,.05) 1px, transparent 1px, transparent 3px); }
+  #voiceScreen.gl::after { content:""; position:absolute; left:0; right:0; height:90px; top:-90px; pointer-events:none; z-index:2;
+    background:linear-gradient(180deg, transparent, rgba(79,209,255,.10), transparent); animation:scan 6s linear infinite; }
+  @keyframes scan { to { transform:translateY(900px); } }
+  .vtop { text-shadow:0 0 12px rgba(79,209,255,.8); }
+  #vState { text-shadow:0 0 10px rgba(79,209,255,.9); font-family:inherit; }
+  #vTranscript { text-shadow:0 0 18px rgba(120,200,255,.7); font-weight:200; letter-spacing:.5px; }
+  .hud { position:absolute; width:22px; height:22px; border:1px solid rgba(79,209,255,.55); z-index:3; pointer-events:none; }
+  .hud.tl { left:10px; top:8px; border-right:0; border-bottom:0; } .hud.tr { right:10px; top:8px; border-left:0; border-bottom:0; }
+  .hud.bl { left:10px; bottom:8px; border-right:0; border-top:0; } .hud.br { right:10px; bottom:8px; border-left:0; border-top:0; }
+  #vLink { position:absolute; bottom:8px; left:70px; right:70px; text-align:center; font-size:10px; letter-spacing:2px; color:#4fd1ff88; z-index:3; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -190,6 +212,7 @@
 
 
 <div id="voiceScreen">
+  <canvas id="gl"></canvas>
   <div class="vtop">Controle por voz</div>
   <div class="vmid">
     <div class="orbwrap"><button class="orb" id="orb" aria-label="Falar"></button></div>
@@ -201,6 +224,8 @@
     <div id="vHist"></div>
     <div id="vHint"></div>
   </div>
+  <i class="hud tl"></i><i class="hud tr"></i><i class="hud bl"></i><i class="hud br"></i>
+  <div id="vLink">LG webOS · LINK <span id="vLinkS">OFFLINE</span></div>
   <button class="mini" id="toClassic" title="Controle com botões">⌗</button>
   <button class="mini" id="vSearch" title="Procurar TV">⟳</button>
 </div>
@@ -244,6 +269,8 @@
 
 <script src="lgtv.js"></script>
 <script src="voice.js"></script>
+<script src="three.min.js"></script>
+<script src="orb3d.js"></script>
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); }, all = function (s) { return [].slice.call(document.querySelectorAll(s)); };
@@ -447,6 +474,23 @@
     vR.className = ''; vR.textContent = cmd.label; pushHist(cmd.label, true); flash('ok'); say('🎤 ' + cmd.label, 'ok');
     cmd.run(tv, ctx).catch(function (e) { vR.className = 'err'; vR.textContent = e.message; pushHist(e.message, false); flash('err'); say(e.message, 'err'); });
   };
+
+
+  /* ===== esfera 3D ===== */
+  var rmsLevel = 0, rmsAt = 0;
+  window.__rms = function (v) { rmsLevel = Math.max(0, Math.min(1, (v + 2) / 12)); rmsAt = Date.now(); };
+  function curState() { var c = orb.className; return /\bok\b/.test(c) ? 'ok' : /\berr\b/.test(c) ? 'err' : /thinking/.test(c) ? 'thinking' : /hearing/.test(c) ? 'hearing' : /listening/.test(c) ? 'listening' : 'idle'; }
+  try {
+    var o3 = window.Orb3D && Orb3D.init($('#gl'), {
+      state: curState,
+      level: function () { return Date.now() - rmsAt < 400 ? rmsLevel : 0; },
+      visible: function () { return document.body.classList.contains('voice') && !document.hidden; },
+      anchor: function () { var r = $('#orb').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; },
+      pointerHost: vs, particles: 3600, maxDpr: 2
+    });
+    if (o3) { vs.classList.add('gl'); setTimeout(function () { o3.resize(); }, 50); setTimeout(function () { o3.resize(); }, 500); window.addEventListener('orientationchange', function () { setTimeout(o3.resize, 300); }); }
+  } catch (e) {}
+  setInterval(function () { $('#vLinkS').textContent = (tv && tv.ready) ? 'ONLINE' : 'OFFLINE'; }, 800);
 
   setMode(store('mode') || 'voice');
 
