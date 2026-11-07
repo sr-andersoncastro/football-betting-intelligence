@@ -17,7 +17,12 @@ import android.webkit.WebView;
 
 import org.json.JSONArray;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.DatagramPacket;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -74,6 +79,36 @@ public class MainActivity extends Activity {
             }).start();
         }
 
+
+
+        /** Busca no YouTube (página de resultados, sem chave de API). Resposta em window.__ytResults([{id,title}]) ou window.__ytErr(msg). */
+        @JavascriptInterface
+        public void ytSearch(final String query) {
+            new Thread(new Runnable() { @Override public void run() {
+                String out;
+                try {
+                    URL u = new URL("https://www.youtube.com/results?hl=pt-BR&gl=BR&search_query=" + URLEncoder.encode(query, "UTF-8"));
+                    HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(10000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36");
+                    c.setRequestProperty("Accept-Language", "pt-BR,pt;q=0.9");
+                    c.setRequestProperty("Cookie", "CONSENT=YES+1");
+                    InputStream in = c.getInputStream();
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    byte[] buf = new byte[16384]; int n; int total = 0;
+                    while ((n = in.read(buf)) > 0 && total < 3000000) { bo.write(buf, 0, n); total += n; }
+                    in.close();
+                    String html = bo.toString("UTF-8");
+                    java.util.List<String[]> r = YtParser.parse(html, 8);
+                    out = r.isEmpty() ? "window.__ytErr && window.__ytErr('O YouTube não retornou vídeos para essa busca')"
+                                      : "window.__ytResults && window.__ytResults(" + YtParser.toJson(r) + ")";
+                } catch (Exception e) {
+                    out = "window.__ytErr && window.__ytErr('Não consegui buscar no YouTube (sem internet no celular?)')";
+                }
+                final String code = out;
+                runOnUiThread(new Runnable() { @Override public void run() { js(code); } });
+            } }).start();
+        }
 
         /** Abre o reconhecimento de voz do Android (pt-BR). Resposta em window.__voice([...]) ou window.__voiceErr(msg). */
         @JavascriptInterface

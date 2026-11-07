@@ -106,6 +106,9 @@
   LGTV.prototype.channelDown = function () { return this.request('ssap://tv/channelDown'); };
   LGTV.prototype.powerOff = function () { return this.request('ssap://system/turnOff'); };
   LGTV.prototype.launch = function (id) { return this.request('ssap://system.launcher/launch', { id: id }); };
+  LGTV.prototype.playYouTube = function (id) {
+    return this.request('ssap://system.launcher/launch', { id: 'youtube.leanback.v4', contentId: id, params: { contentTarget: 'https://www.youtube.com/tv?v=' + id } });
+  };
   LGTV.prototype.toast = function (message) { return this.request('ssap://system.notifications/createToast', { message: message }); };
   LGTV.prototype.setVolume = function (v) { return this.request('ssap://audio/setVolume', { volume: v }); };
   LGTV.prototype.getInputs = function () { return this.request('ssap://tv/getExternalInputList').then(function (r) { return r.devices || []; }); };

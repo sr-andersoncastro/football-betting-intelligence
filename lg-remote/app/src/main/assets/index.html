@@ -175,6 +175,8 @@
   <div class="g4">
     <button class="key btn" data-media="rewind">⏪</button><button class="key btn" data-media="play">▶</button><button class="key btn" data-media="pause">⏸</button><button class="key btn" data-media="fastForward">⏩</button>
   </div>
+  <div class="lbl">Buscar e tocar no YouTube</div>
+  <div class="g2"><input id="ytq" placeholder="ex.: desenhos do bolo fofo"><button class="key btn red" id="ytGo" style="padding:0 16px">Tocar</button></div>
   <div class="lbl">Volume exato</div>
   <input id="vol" type="range" min="0" max="100" value="10">
   <div class="lbl">Entrada (HDMI etc.)</div>
@@ -183,7 +185,7 @@
   <div class="g2"><select id="apps"></select><button class="key btn" id="goApp" style="padding:0 16px">Abrir</button></div>
   <div class="gg"><button class="key btn" data-act="screenOff">Tela apagada</button><button class="key btn" data-act="screenOn">Tela acesa</button></div>
   <div class="g4"><button class="key btn" data-btn="INFO">Info</button><button class="key btn" data-btn="MENU">Menu</button><button class="key btn" data-btn="CC">Legenda</button><button class="key btn" data-btn="ASTERISK">✱</button></div>
-  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “HDMI 1”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
+  <div class="lbl">Comandos de voz (toque no 🎤): “aumentar o volume”, “volume 20”, “mudo”, “canal 5”, “próximo canal”, “abrir Netflix”, “colocar desenhos do bolo fofo no YouTube”, “HDMI 1”, “pausar”, “para cima”, “ok”, “voltar”, “início”, “pesquisar Cidade de Deus”, “desligar a TV”.</div>
   <div class="lbl">Mensagem na tela da TV</div>
   <div class="g2"><input id="toast" placeholder="Texto"><button class="key btn" id="sendToast" style="padding:0 16px">Enviar</button></div>
   <button class="key btn" id="wol" style="width:100%;margin-top:14px;background:linear-gradient(180deg,#2e7d32,#1b4d20)">⏻ Ligar a TV (Wake-on-LAN)</button>
@@ -308,6 +310,32 @@
   wh.addEventListener('touchend', function () { wl = null; });
 
 
+  /* YouTube: busca no celular, toca o primeiro resultado e deixa os outros para escolher */
+  var ytWait = null;
+  function ytSearch(q) {
+    if (!(window.Native && Native.ytSearch)) return Promise.reject(new Error('Busca no YouTube só funciona no APK'));
+    return new Promise(function (resolve, reject) { ytWait = { resolve: resolve, reject: reject, q: q }; Native.ytSearch(q); });
+  }
+  window.__ytResults = function (list) {
+    var w = ytWait; ytWait = null; if (!w) return;
+    if (!tv || !tv.ready) { w.reject(new Error('Sem conexão com a TV')); return; }
+    say('▶ ' + list[0].title, 'ok');
+    tv.playYouTube(list[0].id).then(w.resolve, w.reject);
+    $('#list').innerHTML = '<div style="font-size:12px;color:#8b8b93">Resultados para “' + w.q.replace(/</g, '') + '” — toque para tocar outro:</div>' +
+      list.map(function (v) { return '<button class="pill" style="height:auto;min-height:40px;padding:8px 12px;text-align:left;font-size:14px" data-yt="' + v.id + '">' + v.title.replace(/</g, '&lt;') + '</button>'; }).join('');
+    $('#pop').classList.add('on'); setTimeout(function () { $('#pop').classList.remove('on'); }, 12000);
+  };
+  window.__ytErr = function (msg) { var w = ytWait; ytWait = null; say(msg, 'err'); if (w) w.reject(new Error(msg)); };
+  $('#list').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (b && b.dataset.yt && tv && tv.ready) { buzz(); $('#pop').classList.remove('on'); guard(tv.playYouTube(b.dataset.yt)); }
+  });
+  $('#ytGo').onclick = function () {
+    var q = $('#ytq').value.trim(); if (!q) return;
+    if (!tv || !tv.ready) { say('Sem conexão com a TV', 'err'); return; }
+    close('more'); say('Buscando “' + q + '” no YouTube…', 'wait');
+    ytSearch(q).catch(function (e) { say(e.message, 'err'); });
+  };
+
   /* comando de voz */
   var mic = $('#micBtn');
   function wakeTv() { var mac = store('mac'); if (mac && window.Native && Native.wake) { Native.wake(mac); return Promise.resolve(); } return Promise.reject(new Error('Conecte uma vez com a TV ligada para eu guardar o MAC')); }
@@ -319,7 +347,7 @@
   window.__voiceErr = function (msg) { mic.classList.remove('on'); say(msg, 'err'); };
   window.__voice = function (alts) {
     mic.classList.remove('on');
-    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv };
+    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv, ytSearch: ytSearch };
     var cmd = Voice.pick(alts, ctx);
     if (!cmd) { say('Não entendi: “' + alts[0] + '”', 'err'); return; }
     if (cmd.label !== 'Ligar a TV' && !(tv && tv.ready)) { say('Sem conexão com a TV. Toque em Procurar TV.', 'err'); return; }

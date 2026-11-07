@@ -68,6 +68,13 @@
       });
     }
 
+    // YouTube: "colocar desenhos do bolo fofo no youtube", "youtube bolo fofo", "assistir bolo fofo"
+    var q = null;
+    if ((m = t.match(/^(?:pesquisar|pesquisa|buscar|busca|procurar|procura|colocar|coloca|botar|bota|tocar|toca|passar|passa|ver|assistir|assiste|quero ver|quero assistir|abrir|abre|abra|mostrar|mostra|me mostra)\s+(?:o |a |os |as |um |uma |uns |umas )?(.+?)\s+(?:no|na|do|pelo) youtube$/))) q = m[1];
+    else if ((m = t.match(/^(?:no )?youtube\s+(?:pesquisar |buscar |procurar |colocar |tocar |ver |assistir )?(.+)/)) && !/^(abrir|abre|aberto)$/.test(m[1])) q = m[1];
+    else if ((m = t.match(/^(?:colocar|coloca|botar|bota|tocar|toca|assistir|assiste|quero ver|quero assistir|me mostra|mostrar|mostra)\s+(?:o |a |os |as |um |uma |uns |umas )?(.+)/)) && !find(BUILTIN, m[1], function (b) { return b[0]; })) q = m[1];
+    if (q) { q = q.trim(); return act('YouTube: ' + q, function (tv, c) { return c.ytSearch ? c.ytSearch(q) : Promise.reject(new Error('Busca no YouTube só funciona no APK')); }); }
+
     // apps
     var an = (t.match(/^(?:abrir|abre|abra|iniciar|inicia|colocar|coloca|colocar no|ir para|va para|ir pro|vai pro|ligar o|liga o)\s+(?:o |a |no |na )?(.+)/) || [])[1] || (BUILTIN.some(function (b) { return t === b[0]; }) ? t : null);
     if (an) {
