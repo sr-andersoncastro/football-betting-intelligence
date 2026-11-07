@@ -5,7 +5,8 @@ let rows=[],selected=[],mode='real',visible=50,installation,selectedDay=null,odd
 let predictionGeneration=0;const predictionRequests=new Set();
 const formatter=new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'});
 const date=value=>formatter.format(new Date(value));
-const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
+const dayFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}),dayCache=new Map();
+const day=value=>{if(typeof value!=='string')return dayFormatter.format(new Date(value));let d=dayCache.get(value);if(d===undefined){d=dayFormatter.format(new Date(value));dayCache.set(value,d);}return d;};
 const today=()=>day(new Date());
 const offsetDay=n=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return day(d);};
 const text=(tag,value,className)=>{const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;};
@@ -90,7 +91,11 @@ function renderTips(){
     }
     board.append(card);
   }
-  if(!groups.size)board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite com esses filtros. Afrouxe o filtro avançado, escolha outra data na faixa acima ou mude o tipo de palpite; as previsões cobrem os próximos 7 dias das quatro ligas do piloto.','empty'));
+  if(!groups.size){
+    board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite para este dia com esses filtros. Só há palpites para jogos ainda não iniciados do Brasileirão, Premier League, La Liga e Bundesliga; jogos em andamento ou encerrados e dias sem rodada ficam vazios.','empty'));
+    const upcoming=[...oddsByMatch.values()].map(f=>day(f.kickoff)).filter(d=>d>=today()&&d!==selectedDay).sort()[0];
+    if(mode!=='demo'&&upcoming){const go=text('button','Ver próximo dia com palpites ('+upcoming.slice(8)+'/'+upcoming.slice(5,7)+')','chip');go.type='button';go.addEventListener('click',()=>{selectedDay=upcoming;adv.days='day';$('period').value='day';visible=50;render();});board.append(go);}
+  }
 }
 const pilotLeagues=[{code:'bra.1',name:'Brasileirão Série A'},{code:'eng.1',name:'Premier League'},{code:'esp.1',name:'La Liga'},{code:'bl1',name:'Bundesliga'}];
 function fold(label,className){const details=text('details','',className),summary=text('summary',label);details.append(summary);return {details,summary};}
@@ -265,7 +270,9 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')fab(false);}
 const syncTabs=()=>{for(const link of document.querySelectorAll('.tabbar a'))link.classList.toggle('active',link.getAttribute('href')===(location.hash||'#matches'));};
 window.addEventListener('hashchange',syncTabs);syncTabs();
 $('competition').addEventListener('input',()=>{seasons();visible=50;render();});
-for(const id of ['season','status','search','period'])$(id).addEventListener('input',()=>{visible=50;render();});
+for(const id of ['season','status','period'])$(id).addEventListener('input',()=>{visible=50;render();});
+let searchTimer;
+$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{visible=50;render();},300);});
 $('more').addEventListener('click',()=>{visible+=50;render();});
 $('export').addEventListener('click',()=>{
   const safe=value=>'"'+String(value??'').replace(/^(\s*[=+@\-])/u,"'$1").replaceAll('"','""')+'"';
