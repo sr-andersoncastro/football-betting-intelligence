@@ -90,7 +90,11 @@ function renderTips(){
     }
     board.append(card);
   }
-  if(!groups.size)board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite com esses filtros. Afrouxe o filtro avançado, escolha outra data na faixa acima ou mude o tipo de palpite; as previsões cobrem os próximos 7 dias das quatro ligas do piloto.','empty'));
+  if(!groups.size){
+    board.append(text('p',mode==='demo'?'Palpites disponíveis somente com dados reais.':'Nenhum palpite para este dia com esses filtros. Só há palpites para jogos ainda não iniciados do Brasileirão, Premier League, La Liga e Bundesliga; jogos em andamento ou encerrados e dias sem rodada ficam vazios.','empty'));
+    const upcoming=[...oddsByMatch.values()].map(f=>day(f.kickoff)).filter(d=>d>=today()&&d!==selectedDay).sort()[0];
+    if(mode!=='demo'&&upcoming){const go=text('button','Ver próximo dia com palpites ('+upcoming.slice(8)+'/'+upcoming.slice(5,7)+')','chip');go.type='button';go.addEventListener('click',()=>{selectedDay=upcoming;adv.days='day';$('period').value='day';visible=50;render();});board.append(go);}
+  }
 }
 const pilotLeagues=[{code:'bra.1',name:'Brasileirão Série A'},{code:'eng.1',name:'Premier League'},{code:'esp.1',name:'La Liga'},{code:'bl1',name:'Bundesliga'}];
 function fold(label,className){const details=text('details','',className),summary=text('summary',label);details.append(summary);return {details,summary};}
