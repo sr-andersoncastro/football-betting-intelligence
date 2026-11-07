@@ -93,6 +93,38 @@
   #more { overflow-y:auto; }
   .lbl { font-size:12px; color:var(--dim); margin-top:14px; }
   input[type=range] { padding:0; accent-color:#d4143c; }
+
+  /* ===== Modo Voz (sem botões) ===== */
+  #voiceScreen { display:none; position:fixed; left:0; right:0; top:34px; bottom:0; z-index:12; flex-direction:column; align-items:center; justify-content:space-between; padding:18px 20px 22px;
+    background:radial-gradient(ellipse at 50% 38%, #0d1b2e 0%, #070b14 55%, #030407 100%); overflow:hidden; }
+  body.voice #voiceScreen { display:flex; }
+  body.voice #wrap, body.voice .fab { display:none; }
+  .vtop { text-align:center; font-size:12px; letter-spacing:3px; color:#4fd1ff99; text-transform:uppercase; }
+  .vmid { display:flex; flex-direction:column; align-items:center; gap:22px; width:100%; }
+  .orbwrap { position:relative; width:210px; height:210px; display:flex; align-items:center; justify-content:center; }
+  .orb { position:relative; width:150px; height:150px; border-radius:50%; border:0; padding:0; z-index:2; cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #9ef0ff 0%, #2aa8ff 38%, #4a2cff 75%, #1b0f66 100%);
+    box-shadow:0 0 40px 8px rgba(42,168,255,.45), 0 0 120px 30px rgba(74,44,255,.28), inset 0 0 30px rgba(255,255,255,.35);
+    animation:breathe 4s ease-in-out infinite; transition:filter .3s; }
+  .orb::before, .orb::after { content:""; position:absolute; inset:-2px; border-radius:50%; border:2px solid rgba(79,209,255,.0); }
+  .orb.listening::before, .orb.hearing::before { animation:ripple 1.8s ease-out infinite; }
+  .orb.listening::after, .orb.hearing::after { animation:ripple 1.8s ease-out .9s infinite; }
+  .orb.hearing { animation:pulse .5s ease-in-out infinite; filter:hue-rotate(-25deg) saturate(1.3); }
+  .orb.thinking { animation:spin 1s linear infinite; filter:hue-rotate(60deg); }
+  .orb.ok { filter:hue-rotate(-110deg) saturate(1.4); box-shadow:0 0 50px 12px rgba(56,211,107,.55), 0 0 130px 36px rgba(56,211,107,.25), inset 0 0 30px rgba(255,255,255,.35); }
+  .orb.err { filter:hue-rotate(150deg) saturate(1.6); box-shadow:0 0 50px 12px rgba(255,82,82,.55), 0 0 130px 36px rgba(255,82,82,.25), inset 0 0 30px rgba(255,255,255,.3); }
+  @keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
+  @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.12); } }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes ripple { 0% { transform:scale(1); border-color:rgba(79,209,255,.8); } 100% { transform:scale(1.9); border-color:rgba(79,209,255,0); } }
+  #vState { font-size:13px; letter-spacing:2px; color:#7fd8ff; text-transform:uppercase; min-height:16px; }
+  #vTranscript { font-size:24px; font-weight:300; text-align:center; line-height:1.3; min-height:62px; color:#f0f6ff; padding:0 6px; word-break:break-word; }
+  #vResult { font-size:15px; min-height:22px; color:#7ddc82; text-align:center; }
+  #vResult.err { color:#ff8a80; }
+  #vHist { width:100%; text-align:center; font-size:13px; color:#8fa3b8; min-height:74px; line-height:1.6; }
+  #vHint { font-size:12px; color:#5d7186; text-align:center; min-height:16px; }
+  .mini { position:absolute; bottom:18px; width:40px; height:40px; border-radius:50%; border:1px solid #1c2a3a; background:rgba(12,20,32,.8); color:#5d7186; font-size:17px; padding:0; }
+  #toClassic { left:16px; } #vSearch { right:16px; }
 </style>
 </head>
 <body>
@@ -156,6 +188,23 @@
  </div>
 </div></div>
 
+
+<div id="voiceScreen">
+  <div class="vtop">Controle por voz</div>
+  <div class="vmid">
+    <div class="orbwrap"><button class="orb" id="orb" aria-label="Falar"></button></div>
+    <div id="vState">Toque no círculo para começar</div>
+    <div id="vTranscript"></div>
+    <div id="vResult"></div>
+  </div>
+  <div>
+    <div id="vHist"></div>
+    <div id="vHint"></div>
+  </div>
+  <button class="mini" id="toClassic" title="Controle com botões">⌗</button>
+  <button class="mini" id="vSearch" title="Procurar TV">⟳</button>
+</div>
+
 <button class="fab" id="fabMore" title="Mais comandos">☰</button>
 <button class="fab" id="fabMouse" title="Mouse">🖱</button>
 
@@ -169,7 +218,8 @@
 <!-- Mais -->
 <div class="ov" id="more">
   <div class="ovh"><span>Mais comandos</span><button class="key x" data-close="more">✕</button></div>
-  <div class="lbl" style="margin-top:0">Teclado — digite na tela da TV (abra antes um campo de texto nela)</div>
+  <button class="key btn red" id="toVoice" style="width:100%">🎤 Modo voz (sem botões)</button>
+  <div class="lbl">Teclado — digite na tela da TV (abra antes um campo de texto nela)</div>
   <div class="g2"><input id="txt" placeholder="Digite aqui"><button class="key btn red" id="sendTxt" style="padding:0 16px">Enviar</button></div>
   <div class="g3"><button class="key btn" id="bs">⌫ Apagar</button><button class="key btn" id="enterKey">↵ Enter</button><button class="key btn" data-btn="ENTER">OK</button></div>
   <div class="g4">
@@ -344,16 +394,61 @@
     mic.classList.add('on'); say('🎤 Ouvindo… fale o comando', 'wait'); buzz();
     Native.listen();
   };
-  window.__voiceErr = function (msg) { mic.classList.remove('on'); say(msg, 'err'); };
+  /* ===== voz: botão clássico (janela do Google) e Modo Voz (escuta contínua) ===== */
+  var vs = $('#voiceScreen'), orb = $('#orb'), vState = $('#vState'), vT = $('#vTranscript'), vR = $('#vResult'), vH = $('#vHist'), vHint = $('#vHint');
+  var listening = false, hist = [], flashT = null;
+  var STATES = { idle: 'Toque no círculo para começar', listening: 'Ouvindo…', hearing: 'Estou te ouvindo…', thinking: 'Entendendo…' };
+  var HINTS = ['“abrir Netflix”', '“aumentar o volume”', '“canal 5”', '“colocar desenhos do bolo fofo no YouTube”', '“mudo”', '“HDMI 1”', '“pausar”', '“voltar”', '“desligar a TV”', '“ajuda”', '“modo botões”'];
+  var hi = 0;
+  setInterval(function () { if (document.body.classList.contains('voice')) { vHint.textContent = 'Tente: ' + HINTS[hi++ % HINTS.length]; } }, 5000);
+  vHint.textContent = 'Tente: ' + HINTS[0];
+
+  function setOrb(st) { if (!flashT) orb.className = 'orb ' + st; vState.textContent = STATES[st] || ''; }
+  function flash(cls) { orb.className = 'orb ' + cls; clearTimeout(flashT); flashT = setTimeout(function () { flashT = null; orb.className = 'orb ' + (listening ? 'listening' : ''); }, 1100); }
+  function pushHist(label, ok) {
+    hist.unshift((ok ? '✓ ' : '✗ ') + label); hist = hist.slice(0, 4);
+    vH.innerHTML = hist.map(function (h, i) { return '<div style="opacity:' + (1 - i * 0.24) + '">' + h.replace(/</g, '&lt;') + '</div>'; }).join('');
+  }
+  function setMode(m) {
+    document.body.classList.toggle('voice', m === 'voice'); store('mode', m);
+    if (m !== 'voice' && listening && window.Native && Native.voiceStop) { Native.voiceStop(); }
+    fit();
+  }
+  function showHelp() {
+    vR.className = ''; vR.innerHTML = 'Diga: volume, canal, abrir apps, YouTube, HDMI, pausar, navegação (cima, baixo, ok, voltar), desligar. Veja a lista em Mais comandos.';
+    setTimeout(function () { vR.textContent = ''; }, 9000);
+  }
+  $('#toClassic').onclick = function () { setMode('buttons'); };
+  $('#toVoice').onclick = function () { close('more'); setMode('voice'); };
+  $('#vSearch').onclick = search;
+
+  orb.onclick = function () {
+    if (!(window.Native && Native.voiceStart)) { say('Voz só funciona no APK.', 'err'); return; }
+    if (listening) { Native.voiceStop(); return; }
+    buzz(); vT.textContent = ''; vR.textContent = ''; Native.voiceStart();
+  };
+  window.__voiceState = function (st) {
+    listening = st !== 'idle';
+    setOrb(st);
+    if (st === 'listening') vT.textContent = vT.textContent || '';
+  };
+  window.__voicePartial = function (txt) { vT.textContent = txt; };
+  window.__voiceErr = function (msg) {
+    mic.classList.remove('on'); listening = false; setOrb('idle'); flash('err');
+    vR.className = 'err'; vR.textContent = msg; say(msg, 'err');
+  };
   window.__voice = function (alts) {
     mic.classList.remove('on');
-    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv, ytSearch: ytSearch };
+    vT.textContent = '“' + alts[0] + '”';
+    var ctx = { apps: appsList, inputs: inputsList, wake: wakeTv, ytSearch: ytSearch, setMode: setMode, search: search, help: showHelp };
     var cmd = Voice.pick(alts, ctx);
-    if (!cmd) { say('Não entendi: “' + alts[0] + '”', 'err'); return; }
-    if (cmd.label !== 'Ligar a TV' && !(tv && tv.ready)) { say('Sem conexão com a TV. Toque em Procurar TV.', 'err'); return; }
-    say('🎤 ' + cmd.label, 'ok');
-    cmd.run(tv, ctx).catch(function (e) { say(e.message, 'err'); });
+    if (!cmd) { vR.className = 'err'; vR.textContent = 'Não entendi'; pushHist(alts[0], false); flash('err'); say('Não entendi: “' + alts[0] + '”', 'err'); return; }
+    if (!cmd.local && cmd.label !== 'Ligar a TV' && !(tv && tv.ready)) { vR.className = 'err'; vR.textContent = 'Sem conexão com a TV'; pushHist(cmd.label, false); flash('err'); say('Sem conexão com a TV. Toque em Procurar TV.', 'err'); return; }
+    vR.className = ''; vR.textContent = cmd.label; pushHist(cmd.label, true); flash('ok'); say('🎤 ' + cmd.label, 'ok');
+    cmd.run(tv, ctx).catch(function (e) { vR.className = 'err'; vR.textContent = e.message; pushHist(e.message, false); flash('err'); say(e.message, 'err'); });
   };
+
+  setMode(store('mode') || 'voice');
 
   var saved = store('ip');
   if (saved) connect(saved, true); else search();

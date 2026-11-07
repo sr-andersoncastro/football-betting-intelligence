@@ -4,8 +4,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.graphics.Color;
 import android.view.View;
 import android.view.WindowInsets;
@@ -39,6 +45,65 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
     private static final int REQ_VOICE = 77;
+    private static final int REQ_AUDIO = 78;
+    private SpeechRecognizer sr;
+    private boolean continuous = false;
+    private int errorStreak = 0;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private void startListening() {
+        if (!continuous) return;
+        if (sr == null) { sr = SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(listener); }
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-BR");
+        i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
+        i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+        try { sr.startListening(i); js("window.__voiceState && window.__voiceState('listening')"); }
+        catch (Exception e) { continuous = false; js("window.__voiceErr && window.__voiceErr('Falha ao iniciar o microfone')"); }
+    }
+
+    private void restartSoon(long ms) {
+        handler.postDelayed(new Runnable() { @Override public void run() { startListening(); } }, ms);
+    }
+
+    private final RecognitionListener listener = new RecognitionListener() {
+        @Override public void onReadyForSpeech(Bundle b) { js("window.__voiceState && window.__voiceState('listening')"); }
+        @Override public void onBeginningOfSpeech() { js("window.__voiceState && window.__voiceState('hearing')"); }
+        @Override public void onRmsChanged(float v) { }
+        @Override public void onBufferReceived(byte[] b) { }
+        @Override public void onEndOfSpeech() { js("window.__voiceState && window.__voiceState('thinking')"); }
+        @Override public void onEvent(int t, Bundle b) { }
+        @Override public void onPartialResults(Bundle b) {
+            ArrayList<String> r = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            if (r != null && !r.isEmpty()) js("window.__voicePartial && window.__voicePartial(" + new JSONArray(r.subList(0, 1)).toString() + "[0])");
+        }
+        @Override public void onResults(Bundle b) {
+            errorStreak = 0;
+            ArrayList<String> r = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            if (r != null && !r.isEmpty()) js("window.__voice && window.__voice(" + new JSONArray(r).toString() + ")");
+            if (continuous) restartSoon(350); else js("window.__voiceState && window.__voiceState('idle')");
+        }
+        @Override public void onError(int err) {
+            if (err == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                continuous = false; js("window.__voiceErr && window.__voiceErr('Sem permissão do microfone')"); return;
+            }
+            boolean soft = err == SpeechRecognizer.ERROR_NO_MATCH || err == SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
+            if (soft) errorStreak = 0; else errorStreak++;
+            if (continuous && errorStreak < 5) { restartSoon(soft ? 250 : 900); return; }
+            continuous = false;
+            js("window.__voiceErr && window.__voiceErr('O reconhecimento de voz parou (erro " + err + ")')");
+        }
+    };
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(req, perms, results);
+        if (req != REQ_AUDIO) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) { continuous = true; startListening(); }
+        else js("window.__voiceErr && window.__voiceErr('Permissão do microfone negada')");
+    }
     private WebView web;
 
     private void js(String code) { web.evaluateJavascript(code, null); }
@@ -108,6 +173,31 @@ public class MainActivity extends Activity {
                 final String code = out;
                 runOnUiThread(new Runnable() { @Override public void run() { js(code); } });
             } }).start();
+        }
+
+
+        /** Escuta contínua (sem janela do Google). Resultados em window.__voice / __voicePartial / __voiceState. */
+        @JavascriptInterface
+        public void voiceStart() {
+            runOnUiThread(new Runnable() { @Override public void run() {
+                if (!SpeechRecognizer.isRecognitionAvailable(MainActivity.this)) {
+                    js("window.__voiceErr && window.__voiceErr('Reconhecimento de voz indisponível neste celular')"); return;
+                }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, REQ_AUDIO); return;
+                }
+                continuous = true; errorStreak = 0; startListening();
+            } });
+        }
+
+        @JavascriptInterface
+        public void voiceStop() {
+            runOnUiThread(new Runnable() { @Override public void run() {
+                continuous = false;
+                handler.removeCallbacksAndMessages(null);
+                if (sr != null) { try { sr.cancel(); } catch (Exception ignored) { } }
+                js("window.__voiceState && window.__voiceState('idle')");
+            } });
         }
 
         /** Abre o reconhecimento de voz do Android (pt-BR). Resposta em window.__voice([...]) ou window.__voiceErr(msg). */

@@ -35,8 +35,24 @@
     ctx = ctx || {};
     var t = norm(raw); if (!t) return null;
     var n = times(t), m;
-    function act(label, fn) { return { label: label, run: fn }; }
+    function act(label, fn, local) { return { label: label, run: fn, local: !!local }; }
     function btn(label, name) { return act(label, function (tv) { return seq(n, function () { return tv.button(name); }); }); }
+
+    // comandos locais (não precisam da TV)
+    if (/^(ajuda|socorro|o que voce faz|o que voce sabe fazer|quais (sao )?os comandos|comandos|exemplos)/.test(t)) return act('Ajuda', function (tv, c) { if (c.help) c.help(); return Promise.resolve(); }, true);
+    if (/(modo botoes|modo controle|mostrar (o )?controle|mostrar (os )?botoes|controle com botoes|sair do modo voz)/.test(t)) return act('Modo botões', function (tv, c) { if (c.setMode) c.setMode('buttons'); return Promise.resolve(); }, true);
+    if (/(modo voz|so voz|sem botoes)/.test(t)) return act('Modo voz', function (tv, c) { if (c.setMode) c.setMode('voice'); return Promise.resolve(); }, true);
+    if (/(procurar|buscar|achar|encontrar|reconectar|conectar)( a| na| minha)?( tv| televisao)?$/.test(t) && /(tv|televisao|reconectar|conectar)/.test(t)) return act('Procurar a TV', function (tv, c) { if (c.search) c.search(); return Promise.resolve(); }, true);
+
+    // tela
+    if (/(apagar|desligar|apaga|desliga) a tela/.test(t)) return act('Tela apagada', function (tv) { return tv.screenOff(); });
+    if (/(acender|ligar|acende|liga) a tela/.test(t)) return act('Tela acesa', function (tv) { return tv.screenOn(); });
+    if (/^(legenda|legendas)/.test(t)) return act('Legenda', function (tv) { return tv.button('CC'); });
+    if (/^(info|informacao|informacoes)/.test(t)) return act('Informações', function (tv) { return tv.button('INFO'); });
+    // volume por apelido
+    if (/volume (maximo|no maximo|total)/.test(t)) return act('Volume 100', function (tv) { return tv.setVolume(100); });
+    if (/volume (minimo|no minimo|zero)/.test(t)) return act('Volume 0', function (tv) { return tv.setVolume(0); });
+    if (/volume (na metade|medio|normal)/.test(t)) return act('Volume 50', function (tv) { return tv.setVolume(50); });
 
     // desligar / ligar
     if (/^(desligar|desliga|apagar|apaga)( a| essa| esta)?( tv| televisao)?$/.test(t) || /^(desligar|desliga) (tudo|a tv|a televisao)/.test(t)) return act('Desligar a TV', function (tv) { return tv.powerOff(); });
