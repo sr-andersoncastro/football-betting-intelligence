@@ -5,7 +5,8 @@ let rows=[],selected=[],mode='real',visible=50,installation,selectedDay=null,odd
 let predictionGeneration=0;const predictionRequests=new Set();
 const formatter=new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Sao_Paulo'});
 const date=value=>formatter.format(new Date(value));
-const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
+const dayFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}),dayCache=new Map();
+const day=value=>{if(typeof value!=='string')return dayFormatter.format(new Date(value));let d=dayCache.get(value);if(d===undefined){d=dayFormatter.format(new Date(value));dayCache.set(value,d);}return d;};
 const today=()=>day(new Date());
 const offsetDay=n=>{const d=new Date(today()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return day(d);};
 const text=(tag,value,className)=>{const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;};
