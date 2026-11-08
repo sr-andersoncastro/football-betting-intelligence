@@ -158,7 +158,7 @@
 <div id="wrap"><div id="stage">
  <div class="remote off" id="remote">
   <h1>Controle remoto</h1>
-  <div class="top-keys"><button class="key" id="power" data-act="power" aria-label="Desligar TV">⏻</button><button class="key" data-btn="HOME" aria-label="Início">⌂</button><button class="key" id="inputBtn" data-more="1" aria-label="Entradas">⇥</button></div>
+  <div class="top-keys"><button class="key" id="power" data-act="power" aria-label="Ligar TV" title="Ligar ou desligar a TV" style="flex-direction:column;gap:2px"><span aria-hidden="true" style="font-size:25px;line-height:27px">⏻</span><span id="powerLabel" style="font-size:11px;line-height:14px">Ligar TV</span></button><button class="key" data-btn="HOME" aria-label="Início">⌂</button><button class="key" id="inputBtn" data-more="1" aria-label="Entradas">⇥</button></div>
   <div class="navigation">
     <div class="rocker"><button data-act="volUp" aria-label="Aumentar volume">+</button><span>VOL</span><button data-act="volDown" aria-label="Diminuir volume">−</button></div>
     <div class="wheel"><button class="arr u" data-btn="UP" aria-label="Cima">▲</button><button class="arr d" data-btn="DOWN" aria-label="Baixo">▼</button><button class="arr l" data-btn="LEFT" aria-label="Esquerda"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="15,5 5,12 15,19" fill="currentColor"/></svg></button><button class="arr r" data-btn="RIGHT" aria-label="Direita"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><polygon points="9,5 19,12 9,19" fill="currentColor"/></svg></button><button class="okk" data-btn="ENTER">OK</button></div>
@@ -258,7 +258,7 @@
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
   function guard(p) { if (p && p.catch) p.catch(function (e) { say(e.message, 'err'); }); return p; }
   function buzz() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
-  function setOn(on) { remote.classList.toggle('off', !on); }
+  function setOn(on) { remote.classList.toggle('off', !on); var label = on ? 'Desligar TV' : 'Ligar TV'; $('#powerLabel').textContent = label; $('#power').setAttribute('aria-label', label); }
   $('#ip').value = store('ip') || '';
 
   /* escala o controle para caber inteiro na tela, sem rolar */
@@ -321,6 +321,19 @@
     var d = b.dataset;
     if (d.more) { open('more'); return; }
     if (!(d.btn || d.app || d.media || d.act)) return;
+    // Ligar usa Wake-on-LAN e precisa funcionar sem conexão ativa.
+    if (d.act === 'power') {
+      buzz();
+      if (tv && tv.ready) {
+        guard(tv.powerOff()).then(function () { setOn(false); say('Pedido de desligar enviado.', 'wait'); });
+      } else {
+        wakeTv().then(function () {
+          say('Pedido de ligar enviado. Aguarde alguns segundos; ative Ligar por celular na TV.', 'wait');
+          setTimeout(function () { if (!tv || !tv.ready) { var ip = store('ip'); if (ip) connect(ip, true); else search(); } }, 7000);
+        }).catch(function (e) { say(e.message, 'err'); });
+      }
+      return;
+    }
     if (!tv || !tv.ready) { if (!connecting) search(); return; }
     buzz();
     if (d.btn) return guard(tv.button(d.btn));
@@ -330,7 +343,6 @@
     if (a === 'volUp') guard(tv.volumeUp()); else if (a === 'volDown') guard(tv.volumeDown());
     else if (a === 'chUp') guard(tv.channelUp()); else if (a === 'chDown') guard(tv.channelDown());
     else if (a === 'mute') { muted = !muted; guard(tv.mute(muted)); }
-    else if (a === 'power') guard(tv.powerOff());
     else if (a === 'screenOff') guard(tv.screenOff()); else if (a === 'screenOn') guard(tv.screenOn());
   });
 
@@ -406,7 +418,7 @@
 
   /* comando de voz */
   var mic = $('#micBtn');
-  function wakeTv() { var mac = store('mac'); if (mac && window.Native && Native.wake) { Native.wake(mac); return Promise.resolve(); } return Promise.reject(new Error('Conecte uma vez com a TV ligada para eu guardar o MAC')); }
+  function wakeTv() { var mac = store('mac'); if (!mac) return Promise.reject(new Error('Conecte uma vez com a TV ligada para o app guardar o MAC dela.')); if (!(window.Native && Native.wake)) return Promise.reject(new Error('Ligar a TV só funciona no APK.')); try { Native.wake(mac); return Promise.resolve(); } catch (e) { return Promise.reject(e); } }
   mic.onclick = function () {
     if (!(window.Native && Native.listen)) { say('Voz só funciona no APK.', 'err'); return; }
     mic.classList.add('on'); say('🎤 Ouvindo… fale o comando', 'wait'); buzz();
