@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     private ScrollView dashView;
     private LinearLayout dashBox;
     private int period = 0, dashPlat = 0, curTab = 0;
+    private org.osmdroid.views.MapView mapView;
     private String filter = null; // null = todos
     private long expandedId = -1;
     private Button activate;
@@ -81,7 +82,7 @@ public class MainActivity extends Activity {
 
         LinearLayout dataCard = card(root);
         dataCard.addView(label("Seus dados", 18, TEXT, true));
-        dataCard.addView(label("Histórico, prints e endereços ficam só neste aparelho. O app não tem internet.", 12, MUTED, false));
+        dataCard.addView(label("Histórico, prints e endereços ficam só neste aparelho. A internet é usada apenas para as imagens do mapa e para achar a posição do NOME do bairro; endereços completos, valores e dados de passageiros nunca saem do celular.", 12, MUTED, false));
         Button clear = button("Apagar dados capturados", FIELD, TEXT);
         clear.setOnClickListener(v -> { s.clearTrips(); new Store(this).clear(); Store.deleteAllPrints(this); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
         dataCard.addView(clear, lp(12));
@@ -291,6 +292,13 @@ public class MainActivity extends Activity {
 
         // regiões mais movimentadas (bairro de embarque)
         java.util.List<Stats.RegionStat> regs = Stats.regions(samples);
+
+        // mapa de calor por bairro
+        LinearLayout mc = card(dashBox);
+        ((LinearLayout.LayoutParams) mc.getLayoutParams()).topMargin = dp(14);
+        mc.addView(label("Mapa de calor", 18, TEXT, true));
+        mc.addView(label("Bolhas maiores e mais quentes (azul > laranja > vermelho) = mais ofertas no bairro de embarque. Posição aproximada pelo nome do bairro.", 12, MUTED, false));
+        buildMap(mc, regs);
         LinearLayout rc = card(dashBox);
         ((LinearLayout.LayoutParams) rc.getLayoutParams()).topMargin = dp(14);
         rc.addView(label("Regiões mais movimentadas", 18, TEXT, true));
@@ -351,8 +359,97 @@ public class MainActivity extends Activity {
         }
         hs.addView(cols);
         hc.addView(hs, lp(10));
-        dashBox.addView(label("O app não usa mapa porque não tem internet; o ranking por bairro vem dos endereços lidos nas ofertas.", 11, MUTED, false), lp(14));
     }
+
+    private void buildMap(LinearLayout parent, java.util.List<Stats.RegionStat> regs) {
+        org.osmdroid.config.Configuration cfg = org.osmdroid.config.Configuration.getInstance();
+        cfg.setUserAgentValue(getPackageName());
+        cfg.setOsmdroidBasePath(new java.io.File(getCacheDir(), "osmdroid"));
+        cfg.setOsmdroidTileCache(new java.io.File(getCacheDir(), "osmdroid/tiles"));
+        if (mapView != null) { mapView.onDetach(); }
+        org.osmdroid.views.MapView mv = new org.osmdroid.views.MapView(this);
+        mapView = mv;
+        mv.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK);
+        mv.setMultiTouchControls(true);
+        mv.setOnTouchListener((v, e) -> { v.getParent().requestDisallowInterceptTouchEvent(true); return false; });
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(340));
+        mlp.topMargin = dp(10);
+        parent.addView(mv, mlp);
+
+        Store st = new Store(this);
+        java.util.List<double[]> pts = new java.util.ArrayList<>();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        java.util.List<String> need = new java.util.ArrayList<>();
+        int max = regs.isEmpty() ? 1 : regs.get(0).count;
+        for (int i = 0; i < Math.min(40, regs.size()); i++) {
+            Stats.RegionStat r = regs.get(i);
+            String key = r.name.toLowerCase(Locale.ROOT);
+            double[] g = st.geoRow(key);
+            if (g == null) { need.add(key); continue; }
+            if (g[0] > 900) continue;
+            pts.add(new double[]{g[0], g[1], r.count / (double) max, r.count});
+            names.add(r.name);
+        }
+        mv.getOverlays().add(new HeatOverlay(pts, names));
+        mv.getController().setZoom(11.5);
+        mv.getController().setCenter(new org.osmdroid.util.GeoPoint(-30.0346, -51.2177));
+        if (pts.size() == 1) {
+            mv.getController().setZoom(14.0);
+            mv.getController().setCenter(new org.osmdroid.util.GeoPoint(pts.get(0)[0], pts.get(0)[1]));
+        } else if (pts.size() > 1) {
+            java.util.List<org.osmdroid.util.GeoPoint> gp = new java.util.ArrayList<>();
+            for (double[] p : pts) gp.add(new org.osmdroid.util.GeoPoint(p[0], p[1]));
+            mv.post(() -> mv.zoomToBoundingBox(org.osmdroid.util.BoundingBox.fromGeoPoints(gp), false, dp(50)));
+        }
+        parent.addView(label(need.isEmpty() ? "Mapa © colaboradores do OpenStreetMap" : "Localizando bairros no mapa… (precisa de internet)  ·  Mapa © colaboradores do OpenStreetMap", 11, MUTED, false), lp(6));
+        Geo.resolve(this, need, () -> { if (curTab == 0) refreshDash(); });
+    }
+
+    /** Desenha uma bolha de calor por bairro. */
+    private class HeatOverlay extends org.osmdroid.views.overlay.Overlay {
+        private final java.util.List<double[]> pts;
+        private final java.util.List<String> names;
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint text = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        HeatOverlay(java.util.List<double[]> pts, java.util.List<String> names) {
+            this.pts = pts; this.names = names;
+            text.setColor(Color.WHITE);
+            text.setTextSize(dp(11));
+            text.setTextAlign(android.graphics.Paint.Align.CENTER);
+            text.setFakeBoldText(true);
+            text.setShadowLayer(dp(3), 0, 0, Color.BLACK);
+        }
+
+        private int heat(double w) {
+            int a = Color.parseColor("#3B82F6"), b = Color.parseColor("#F59E0B"), c = Color.parseColor("#EF4444");
+            return w < 0.5 ? mix(a, b, w * 2) : mix(b, c, (w - 0.5) * 2);
+        }
+
+        private int mix(int x, int y, double f) {
+            return Color.rgb((int) (Color.red(x) + (Color.red(y) - Color.red(x)) * f),
+                    (int) (Color.green(x) + (Color.green(y) - Color.green(x)) * f),
+                    (int) (Color.blue(x) + (Color.blue(y) - Color.blue(x)) * f));
+        }
+
+        @Override public void draw(android.graphics.Canvas c, org.osmdroid.views.MapView mv, boolean shadow) {
+            if (shadow) return;
+            org.osmdroid.views.Projection proj = mv.getProjection();
+            for (int i = 0; i < pts.size(); i++) {
+                double[] p = pts.get(i);
+                android.graphics.Point pt = proj.toPixels(new org.osmdroid.util.GeoPoint(p[0], p[1]), null);
+                float r = dp(26) + dp(34) * (float) p[2];
+                int col = heat(p[2]);
+                paint.setShader(new android.graphics.RadialGradient(pt.x, pt.y, r,
+                        Color.argb(200, Color.red(col), Color.green(col), Color.blue(col)),
+                        Color.argb(0, Color.red(col), Color.green(col), Color.blue(col)), android.graphics.Shader.TileMode.CLAMP));
+                c.drawCircle(pt.x, pt.y, r, paint);
+                c.drawText(names.get(i) + " · " + (int) p[3], pt.x, pt.y + dp(4), text);
+            }
+        }
+    }
+
+    @Override protected void onPause() { super.onPause(); if (mapView != null) mapView.onPause(); }
 
     private static String money(double v) { return String.format(Locale.US, "R$ %.2f", v).replace('.', ','); }
 
@@ -494,6 +591,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (mapView != null) mapView.onResume();
         boolean on = serviceEnabled();
         statusCard.setBackground(rounded(CARD, 18, on ? GREEN : RED));
         statusTitle.setText(on ? "● Ativo" : "● Desativado");

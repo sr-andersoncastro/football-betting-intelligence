@@ -23,11 +23,12 @@ final class Store extends SQLiteOpenHelper {
         double perMin() { return totalMin() > 0 ? value / totalMin() : 0; }
     }
 
-    Store(Context c) { super(c.getApplicationContext(), "history.db", null, 2); }
+    Store(Context c) { super(c.getApplicationContext(), "history.db", null, 3); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE offers(id INTEGER PRIMARY KEY, at INTEGER, platform TEXT, value REAL, pickupKm REAL, pickupMin REAL,"
                 + " tripKm REAL, tripMin REAL, dest TEXT, accepted INTEGER DEFAULT 0, pickupAddr TEXT, pickupRegion TEXT, destRegion TEXT)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS geo(name TEXT PRIMARY KEY, lat REAL, lon REAL, ts INTEGER)");
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {
@@ -36,6 +37,7 @@ final class Store extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE offers ADD COLUMN pickupRegion TEXT");
             db.execSQL("ALTER TABLE offers ADD COLUMN destRegion TEXT");
         }
+        db.execSQL("CREATE TABLE IF NOT EXISTS geo(name TEXT PRIMARY KEY, lat REAL, lon REAL, ts INTEGER)");
     }
 
     /** Grava a oferta, ignorando repetição da mesma oferta nos últimos 10 minutos (o card é lido várias vezes). */
@@ -99,5 +101,17 @@ final class Store extends SQLiteOpenHelper {
     static void deleteAllPrints(Context c) {
         java.io.File[] files = new java.io.File(c.getFilesDir(), "prints").listFiles();
         if (files != null) for (java.io.File f : files) f.delete();
+    }
+
+    // ---- posição aproximada dos bairros (cache; só o NOME do bairro é consultado online) ----
+    /** @return {lat, lon, ts} (lat > 900 = não encontrado) ou null se nunca consultado. */
+    double[] geoRow(String key) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT lat,lon,ts FROM geo WHERE name=?", new String[]{key})) {
+            return c.moveToFirst() ? new double[]{c.getDouble(0), c.getDouble(1), c.getLong(2)} : null;
+        }
+    }
+
+    void putGeo(String key, double lat, double lon) {
+        getWritableDatabase().execSQL("INSERT OR REPLACE INTO geo(name,lat,lon,ts) VALUES(?,?,?,?)", new Object[]{key, lat, lon, System.currentTimeMillis()});
     }
 }
