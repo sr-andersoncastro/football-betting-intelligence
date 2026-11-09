@@ -33,19 +33,21 @@ final class Store extends SQLiteOpenHelper {
     @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {}
 
     /** Grava a oferta, ignorando repetição da mesma oferta nos últimos 10 minutos (o card é lido várias vezes). */
-    void add(String platform, OfferParser.Offer o, long at) {
+    /** @return id da nova linha, ou -1 se for repetição. */
+    long add(String platform, OfferParser.Offer o, long at) {
         SQLiteDatabase db = getWritableDatabase();
         try (Cursor c = db.rawQuery("SELECT id FROM offers WHERE platform=? AND value=? AND pickupKm=? AND tripKm=? AND at>? LIMIT 1",
                 new String[]{platform, String.valueOf(o.value), String.valueOf(o.pickupKm), String.valueOf(o.tripKm), String.valueOf(at - 600000)})) {
-            if (c.moveToFirst()) return;
+            if (c.moveToFirst()) return -1;
         }
         ContentValues v = new ContentValues();
         v.put("at", at); v.put("platform", platform); v.put("value", o.value);
         v.put("pickupKm", o.pickupKm); v.put("pickupMin", o.pickupMin);
         v.put("tripKm", o.tripKm); v.put("tripMin", o.tripMin);
         v.put("dest", o.destination == null ? "" : o.destination);
-        db.insert("offers", null, v);
+        long id = db.insert("offers", null, v);
         db.execSQL("DELETE FROM offers WHERE id NOT IN (SELECT id FROM offers ORDER BY at DESC LIMIT 500)");
+        return id;
     }
 
     void markAccepted(String dest, long since) {
@@ -70,4 +72,20 @@ final class Store extends SQLiteOpenHelper {
     }
 
     void clear() { getWritableDatabase().execSQL("DELETE FROM offers"); }
+
+    // ---- prints das ofertas (JPEG reduzido, em armazenamento privado do app; só os 100 mais recentes) ----
+    static java.io.File printFile(Context c, long id) { return new java.io.File(new java.io.File(c.getFilesDir(), "prints"), id + ".jpg"); }
+
+    void cleanupPrints(Context c) {
+        java.io.File[] files = new java.io.File(c.getFilesDir(), "prints").listFiles();
+        if (files == null) return;
+        java.util.Set<String> keep = new java.util.HashSet<>();
+        for (Row r : list(null, 100)) keep.add(r.id + ".jpg");
+        for (java.io.File f : files) if (!keep.contains(f.getName())) f.delete();
+    }
+
+    static void deleteAllPrints(Context c) {
+        java.io.File[] files = new java.io.File(c.getFilesDir(), "prints").listFiles();
+        if (files != null) for (java.io.File f : files) f.delete();
+    }
 }

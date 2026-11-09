@@ -87,7 +87,7 @@ public class MainActivity extends Activity {
         mapsBtn.setOnClickListener(v -> openMaps());
         dest.addView(mapsBtn, lp(12));
         Button clear = button("Apagar dados capturados", FIELD, TEXT);
-        clear.setOnClickListener(v -> { s.clearTrips(); new Store(this).clear(); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
+        clear.setOnClickListener(v -> { s.clearTrips(); new Store(this).clear(); Store.deleteAllPrints(this); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
         dest.addView(clear, lp(8));
         space(root, 14);
         LinearLayout dg = card(root);
@@ -281,13 +281,41 @@ public class MainActivity extends Activity {
             box.addView(label(String.format(Locale.US, "%.0f minutos e %.1f km para o desembarque", r.tripMin, r.tripKm).replace('.', ','), 14, TEXT, false), lp(4));
             if (!r.dest.isEmpty()) {
                 box.addView(label(r.dest, 15, TEXT, true), lp(10));
-                Button maps = button("Abrir no Google Maps", GREEN, Color.parseColor("#06260F"));
-                maps.setOnClickListener(x -> openMapsTo(r.dest));
-                box.addView(maps, lp(10));
             }
+            LinearLayout btns = new LinearLayout(this);
+            btns.setOrientation(LinearLayout.HORIZONTAL);
+            Button maps = button("Google Maps", GREEN, Color.parseColor("#06260F"));
+            maps.setTextSize(15);
+            maps.setEnabled(!r.dest.isEmpty());
+            maps.setAlpha(r.dest.isEmpty() ? 0.4f : 1f);
+            maps.setOnClickListener(x -> openMapsTo(r.dest));
+            boolean hasPrint = Store.printFile(this, r.id).exists();
+            Button print = button("Ver print", FIELD, TEXT);
+            print.setTextSize(15);
+            print.setEnabled(hasPrint);
+            print.setAlpha(hasPrint ? 1f : 0.4f);
+            print.setOnClickListener(x -> showPrint(r));
+            LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            l1.rightMargin = dp(8);
+            btns.addView(maps, l1);
+            btns.addView(print, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            box.addView(btns, lp(12));
         }
         box.setOnClickListener(x -> { expandedId = open ? -1 : r.id; refreshHistory(); });
         return box;
+    }
+
+    private void showPrint(Store.Row r) {
+        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(Store.printFile(this, r.id).getAbsolutePath());
+        if (bmp == null) { Toast.makeText(this, "Print não encontrado", Toast.LENGTH_SHORT).show(); return; }
+        android.app.Dialog d = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        iv.setBackgroundColor(Color.BLACK);
+        iv.setImageBitmap(bmp);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setOnClickListener(v -> d.dismiss());
+        d.setContentView(iv);
+        d.show();
     }
 
     private static String ago(long at) {

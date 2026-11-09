@@ -116,7 +116,7 @@ public class OfferService extends AccessibilityService {
             if (o != null) {
                 found = true;
                 lastTreeHit = System.currentTimeMillis();
-                rememberOffer(o, pkg.equals(UBER) ? "Uber" : "99");
+                rememberOffer(o, pkg.equals(UBER) ? "Uber" : "99", null);
                 if (!text.equals(lastShownText)) {
                     lastShownText = text;
                     settings.setLastRaw(text);
@@ -145,8 +145,14 @@ public class OfferService extends AccessibilityService {
     private String pendingDest = "";
     private long pendingAt;
 
-    private void rememberOffer(OfferParser.Offer o, String platform) {
-        try { store.add(platform, o, System.currentTimeMillis()); } catch (Exception ex) { Log.e(TAG, "historico", ex); }
+    private void rememberOffer(OfferParser.Offer o, String platform, Bitmap shot) {
+        try {
+            long id = store.add(platform, o, System.currentTimeMillis());
+            if (id > 0) {
+                if (shot != null) savePrint(id, shot);   // caminho do OCR: já temos o print
+                else captureAndSave(id);                  // caminho da leitura normal: tira um print agora
+            }
+        } catch (Exception ex) { Log.e(TAG, "historico", ex); }
         if (o.destination == null) return;
         pendingDest = o.destination;
         pendingAt = System.currentTimeMillis();
@@ -164,6 +170,37 @@ public class OfferService extends AccessibilityService {
             try { store.markAccepted(pendingDest, pendingAt - 5000); } catch (Exception ex) { Log.e(TAG, "historico", ex); }
             pendingDest = "";
         }
+    }
+
+    private void savePrint(long id, Bitmap src) {
+        try {
+            int w = Math.min(720, src.getWidth());
+            int h = Math.round(src.getHeight() * (w / (float) src.getWidth()));
+            Bitmap small = Bitmap.createScaledBitmap(src, w, h, true);
+            java.io.File f = Store.printFile(this, id);
+            f.getParentFile().mkdirs();
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) { small.compress(Bitmap.CompressFormat.JPEG, 75, out); }
+            if (small != src) small.recycle();
+            store.cleanupPrints(this);
+        } catch (Exception ex) { Log.e(TAG, "print", ex); }
+    }
+
+    private void captureAndSave(long id) {
+        try {
+            takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
+                @Override public void onSuccess(ScreenshotResult r) {
+                    try {
+                        HardwareBuffer hb = r.getHardwareBuffer();
+                        Bitmap hw = Bitmap.wrapHardwareBuffer(hb, r.getColorSpace());
+                        Bitmap bmp = hw.copy(Bitmap.Config.ARGB_8888, false);
+                        hw.recycle(); hb.close();
+                        savePrint(id, bmp);
+                        bmp.recycle();
+                    } catch (Exception ex) { Log.e(TAG, "print", ex); }
+                }
+                @Override public void onFailure(int code) { Log.d(TAG, "print falhou " + code); }
+            });
+        } catch (Exception ex) { Log.e(TAG, "print", ex); }
     }
 
     private long lastTreeHit;
@@ -200,7 +237,7 @@ public class OfferService extends AccessibilityService {
                     }
                     final Bitmap img = bmp;
                     recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(img, 0))
-                            .addOnSuccessListener(res -> { ocrBusy = false; img.recycle(); onOcrText(res.getText()); })
+                            .addOnSuccessListener(res -> { ocrBusy = false; onOcrText(res.getText(), img); img.recycle(); })
                             .addOnFailureListener(ex -> { ocrBusy = false; img.recycle(); ocrInfo = "OCR falhou: " + ex; diag(""); });
                 }
                 @Override public void onFailure(int code) {
@@ -216,7 +253,7 @@ public class OfferService extends AccessibilityService {
         }
     }
 
-    private void onOcrText(String text) {
+    private void onOcrText(String text, Bitmap shot) {
         ocrInfo = now() + ", " + text.length() + " caracteres:\n" + (text.length() > 500 ? text.substring(0, 500) : text);
         if (looksLikeOffer(text)) lastOfferInfo = "OCR " + ocrInfo;
         OfferParser.Offer o = OfferParser.parse(text);
@@ -229,7 +266,7 @@ public class OfferService extends AccessibilityService {
                         o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
                 showCard(o);
             }
-            rememberOffer(o, ocrPkg.equals(UBER) ? "Uber" : "99");
+            rememberOffer(o, ocrPkg.equals(UBER) ? "Uber" : "99", shot);
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
         } else {
