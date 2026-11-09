@@ -69,4 +69,10 @@ final class Stats {
         for (int i = 0; i < 24; i++) if (h.count[i] >= minCount && (best < 0 || h.avgPerHour[i] > h.avgPerHour[best])) best = i;
         return best;
     }
+
+    /** Categoria pelo R$/km já arredondado a centavos (como aparece na tela): 0 = ruim, 1 = média, 2 = boa. */
+    static int category(double perKm, double badBelow, double goodFrom) {
+        long v = Math.round(perKm * 100), bad = Math.round(badBelow * 100), good = Math.round(goodFrom * 100);
+        return v < bad ? 0 : (v < good ? 1 : 2);
+    }
 }

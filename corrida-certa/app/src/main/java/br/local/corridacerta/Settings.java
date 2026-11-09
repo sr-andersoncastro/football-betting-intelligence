@@ -6,10 +6,15 @@ import android.content.SharedPreferences;
 final class Settings {
     private final SharedPreferences p;
     Settings(Context c) { p = c.getApplicationContext().getSharedPreferences("settings", Context.MODE_PRIVATE); }
-    double minPerKm() { return Double.longBitsToDouble(p.getLong("minKm", Double.doubleToLongBits(1.80))); }
+    /** Abaixo deste R$/km a corrida é "ruim". */
+    double badBelowKm() { return Double.longBitsToDouble(p.getLong("badKm", Double.doubleToLongBits(1.30))); }
+    /** A partir deste R$/km a corrida é "boa"; entre os dois é "média". */
+    double goodFromKm() { return Double.longBitsToDouble(p.getLong("goodKm", Double.doubleToLongBits(1.60))); }
+    int category(double perKm) { return Stats.category(perKm, badBelowKm(), goodFromKm()); }
     double minPerHour() { return Double.longBitsToDouble(p.getLong("minHour", Double.doubleToLongBits(30.0))); }
-    void save(double perKm, double perHour) {
-        p.edit().putLong("minKm", Double.doubleToLongBits(perKm)).putLong("minHour", Double.doubleToLongBits(perHour)).apply();
+    void save(double badBelow, double goodFrom, double perHour) {
+        p.edit().putLong("badKm", Double.doubleToLongBits(badBelow)).putLong("goodKm", Double.doubleToLongBits(goodFrom))
+                .putLong("minHour", Double.doubleToLongBits(perHour)).apply();
     }
     boolean enabled() { return p.getBoolean("enabled", true); }
     void setEnabled(boolean v) { p.edit().putBoolean("enabled", v).apply(); }

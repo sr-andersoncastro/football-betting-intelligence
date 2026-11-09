@@ -40,4 +40,14 @@ public class StatsTest {
         assertEquals(20, Stats.bestHour(h, 2));
         assertEquals(-1, Stats.bestHour(Stats.hourly(new ArrayList<>()), 2));
     }
+
+    @Test public void categoriasPorKm() {
+        assertEquals(0, Stats.category(1.29, 1.30, 1.60));
+        assertEquals(0, Stats.category(1.294, 1.30, 1.60));
+        assertEquals(1, Stats.category(1.30, 1.30, 1.60));
+        assertEquals(1, Stats.category(1.59, 1.30, 1.60));
+        assertEquals(2, Stats.category(1.60, 1.30, 1.60));
+        assertEquals(2, Stats.category(1.596, 1.30, 1.60)); // aparece como R$ 1,60
+        assertEquals(2, Stats.category(2.05, 1.30, 1.60));
+    }
 }

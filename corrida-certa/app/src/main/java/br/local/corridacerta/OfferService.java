@@ -293,9 +293,8 @@ public class OfferService extends AccessibilityService {
 
     private void showCard(OfferParser.Offer o) {
         removeCard();
-        boolean kmOk = o.perKm() >= settings.minPerKm();
-        boolean hourOk = o.perHour() >= settings.minPerHour();
-        int color = kmOk && hourOk ? Color.rgb(27, 143, 76) : (!kmOk && !hourOk ? Color.rgb(198, 40, 40) : Color.rgb(230, 140, 0));
+        int cat = settings.category(o.perKm()); // 0 ruim, 1 média, 2 boa (pelo R$/km)
+        int color = cat == 2 ? Color.rgb(27, 143, 76) : (cat == 0 ? Color.rgb(198, 40, 40) : Color.rgb(230, 140, 0));
 
         card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -307,6 +306,8 @@ public class OfferService extends AccessibilityService {
 
         TextView l1 = line(String.format(Locale.US, "R$ %.2f/km   R$ %.2f/h", o.perKm(), o.perHour()), 20, true);
         TextView l2 = line(String.format(Locale.US, "%.1f km · %.0f min%s", o.totalKm(), o.totalMin(), o.bundle ? " · pacote" : ""), 13, false);
+        TextView l0 = line(cat == 2 ? "Corrida boa" : (cat == 0 ? "Corrida ruim" : "Corrida média"), 14, true);
+        card.addView(l0);
         card.addView(l1);
         card.addView(l2);
 

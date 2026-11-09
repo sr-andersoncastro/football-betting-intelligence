@@ -90,7 +90,7 @@ public class MainActivity extends Activity {
         // Metas
         LinearLayout goals = card(root);
         goals.addView(label("Suas metas", 18, TEXT, true));
-        goals.addView(label("Verde: acima das duas metas · Laranja: abaixo de uma · Vermelho: abaixo das duas.", 12, MUTED, false));
+        goals.addView(label("Corrida boa (verde), média (laranja) ou ruim (vermelha), pelo R$/km.", 12, MUTED, false));
         Switch sw = new Switch(this);
         sw.setText("Mostrar cartão sobre as corridas");
         sw.setTextColor(TEXT);
@@ -102,18 +102,23 @@ public class MainActivity extends Activity {
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        EditText km = field(String.format(Locale.US, "%.2f", s.minPerKm()));
-        EditText hr = field(String.format(Locale.US, "%.2f", s.minPerHour()));
-        row.addView(fieldBox("Mínimo R$/km", km), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        EditText bad = field(String.format(Locale.US, "%.2f", s.badBelowKm()));
+        EditText good = field(String.format(Locale.US, "%.2f", s.goodFromKm()));
+        row.addView(fieldBox("Ruim: abaixo de R$/km", bad), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         space(row, 12, true);
-        row.addView(fieldBox("Mínimo R$/hora", hr), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        row.addView(fieldBox("Boa: a partir de R$/km", good), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         goals.addView(row, lp(14));
+        goals.addView(label("Entre os dois valores a corrida é média (laranja).", 12, MUTED, false), lp(6));
+        EditText hr = field(String.format(Locale.US, "%.2f", s.minPerHour()));
+        goals.addView(fieldBox("Meta R$/hora (usada no gráfico por horário)", hr), lp(12));
 
         Button save = button("Salvar metas", GREEN, Color.parseColor("#06260F"));
         save.setOnClickListener(v -> {
             try {
-                s.save(Double.parseDouble(km.getText().toString().replace(',', '.')),
-                       Double.parseDouble(hr.getText().toString().replace(',', '.')));
+                double b = Double.parseDouble(bad.getText().toString().replace(',', '.'));
+                double g = Double.parseDouble(good.getText().toString().replace(',', '.'));
+                if (b > g) { Toast.makeText(this, "O valor de \"ruim\" deve ser menor que o de \"boa\"", Toast.LENGTH_LONG).show(); return; }
+                s.save(b, g, Double.parseDouble(hr.getText().toString().replace(',', '.')));
                 Toast.makeText(this, "Metas salvas", Toast.LENGTH_SHORT).show();
             } catch (NumberFormatException e) {
                 Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
@@ -302,12 +307,13 @@ public class MainActivity extends Activity {
         LinearLayout rc = card(dashBox);
         ((LinearLayout.LayoutParams) rc.getLayoutParams()).topMargin = dp(14);
         rc.addView(label("Regiões mais movimentadas", 18, TEXT, true));
-        rc.addView(label("Bairro de onde sai a corrida (embarque). Cor: R$/h médio contra a sua meta.", 12, MUTED, false));
+        rc.addView(label("Bairro de onde sai a corrida (embarque). Cor pelo R$/km médio: verde = boa, laranja = média, vermelha = ruim.", 12, MUTED, false));
         if (regs.isEmpty()) rc.addView(label("Os endereços de embarque ainda não foram lidos nestas ofertas.", 13, MUTED, false), lp(8));
         int max = regs.isEmpty() ? 1 : regs.get(0).count;
         for (int i = 0; i < Math.min(10, regs.size()); i++) {
             Stats.RegionStat r = regs.get(i);
-            int col = r.avgPerHour >= s.minPerHour() ? GREEN : (r.avgPerHour >= s.minPerHour() * 0.8 ? AMBER : MUTED);
+            int rc2 = s.category(r.avgPerKm);
+            int col = rc2 == 2 ? GREEN : (rc2 == 1 ? AMBER : RED);
             rc.addView(label((i + 1) + ". " + r.name + "  ·  " + r.count + (r.count == 1 ? " oferta" : " ofertas"), 14, TEXT, true), lp(12));
             LinearLayout bar = new LinearLayout(this);
             bar.setOrientation(LinearLayout.HORIZONTAL);
@@ -493,8 +499,8 @@ public class MainActivity extends Activity {
     }
 
     private View historyRow(Store.Row r) {
-        boolean kmOk = r.perKm() >= s.minPerKm(), hourOk = r.perHour() >= s.minPerHour();
-        int dot = kmOk && hourOk ? GREEN : (!kmOk && !hourOk ? RED : AMBER);
+        int cat = s.category(r.perKm());
+        int dot = cat == 2 ? GREEN : (cat == 0 ? RED : AMBER);
         boolean open = r.id == expandedId;
 
         LinearLayout box = new LinearLayout(this);
