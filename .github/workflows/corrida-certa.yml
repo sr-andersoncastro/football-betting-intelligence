@@ -1,8 +1,6 @@
 name: Corrida Certa APK
 on:
-  push:
-    paths: ['corrida-certa/**', '.github/workflows/corrida-certa.yml']
-  workflow_dispatch:
+  workflow_dispatch:   # só compila quando pedido (o APK não é gerado a cada alteração)
 permissions:
   contents: read
 jobs:
