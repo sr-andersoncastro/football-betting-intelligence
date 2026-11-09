@@ -52,7 +52,9 @@ public class MainActivity extends Activity {
         sv.addView(root);
 
         // Cabeçalho
-        root.addView(label("Corrida Certa", 28, TEXT, true));
+        String ver = "?";
+        try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
+        root.addView(label("Corrida Certa  v" + ver, 28, TEXT, true));
         root.addView(label("Veja R$/km e R$/hora de cada corrida da Uber e da 99, antes de aceitar.", 14, MUTED, false));
         space(root, 18);
 
@@ -66,6 +68,20 @@ public class MainActivity extends Activity {
         activate.setOnClickListener(v -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         statusCard.addView(activate, lp(12));
         statusCard.addView(label("Em Acessibilidade > Apps instalados > Corrida Certa > Ligar.\nSe estiver bloqueado: Info do app > ⋮ > Permitir configurações restritas.", 12, MUTED, false), lp(10));
+        space(root, 14);
+
+        LinearLayout dg = card(root);
+        dg.addView(label("Diagnóstico", 18, TEXT, true));
+        diagText = label("", 11, MUTED, false);
+        dg.addView(diagText, lp(8));
+        Button copy = button("Copiar diagnóstico", FIELD, TEXT);
+        copy.setOnClickListener(v -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("diagnostico", diagText.getText()));
+            Toast.makeText(this, "Copiado. Cole na conversa.", Toast.LENGTH_SHORT).show();
+        });
+        dg.addView(copy, lp(12));
+
         space(root, 14);
 
         // Metas
@@ -114,19 +130,6 @@ public class MainActivity extends Activity {
         toggle.setOnClickListener(v -> lastRaw.setVisibility(lastRaw.getVisibility() == View.GONE ? View.VISIBLE : View.GONE));
         last.addView(toggle, lp(12));
         last.addView(lastRaw, lp(8));
-
-        space(root, 14);
-        LinearLayout dg = card(root);
-        dg.addView(label("Diagnóstico", 18, TEXT, true));
-        diagText = label("", 11, MUTED, false);
-        dg.addView(diagText, lp(8));
-        Button copy = button("Copiar diagnóstico", FIELD, TEXT);
-        copy.setOnClickListener(v -> {
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("diagnostico", diagText.getText()));
-            Toast.makeText(this, "Copiado. Cole na conversa.", Toast.LENGTH_SHORT).show();
-        });
-        dg.addView(copy, lp(12));
 
         setContentView(sv);
     }
