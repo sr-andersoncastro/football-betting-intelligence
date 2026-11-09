@@ -12,8 +12,10 @@ public final class OfferParser {
     public static final class Offer {
         public final double value, pickupKm, tripKm, pickupMin, tripMin;
         public final boolean bundle;
+        public final String destination; // endereço da linha logo após o trecho da viagem (pode ser null)
 
-        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle) {
+        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle, String destination) {
+            this.destination = destination;
             this.value = value; this.pickupKm = pickupKm; this.pickupMin = pickupMin;
             this.tripKm = tripKm; this.tripMin = tripMin; this.bundle = bundle;
         }
@@ -40,7 +42,9 @@ public final class OfferParser {
 
         List<double[]> legs = new ArrayList<>(); // {min, km}
         Matcher l = LEG.matcher(text);
+        int tripEnd = -1;
         while (l.find()) {
+            tripEnd = l.end();
             double min = Double.parseDouble(l.group(2)) + (l.group(1) != null ? Double.parseDouble(l.group(1)) * 60 : 0);
             legs.add(new double[]{min, km(l.group(3), l.group(4))});
         }
@@ -54,11 +58,24 @@ public final class OfferParser {
                 || text.matches("(?s).*Aceitar\\s+[2-9]\\s+viagens.*");
         double[] trip = legs.get(legs.size() - 1);
         double[] pickup = legs.size() >= 2 ? legs.get(0) : new double[]{0, 0};
-        return new Offer(value, pickup[1], pickup[0], trip[1], trip[0], bundle);
+        return new Offer(value, pickup[1], pickup[0], trip[1], trip[0], bundle, tripEnd < 0 ? null : addressAfter(text, tripEnd));
     }
 
     private static double km(String n, String unit) {
         double v = Double.parseDouble(n.replace(',', '.'));
         return unit.equalsIgnoreCase("m") ? v / 1000.0 : v;
+    }
+
+    /** Primeira linha de endereço depois do trecho da viagem; junta a linha seguinte se a primeira termina em vírgula/hífen (quebra do OCR). */
+    static String addressAfter(String text, int from) {
+        String[] lines = text.substring(from).split("\\R");
+        java.util.List<String> ls = new ArrayList<>();
+        for (String s : lines) { s = s.trim(); if (!s.isEmpty()) ls.add(s); if (ls.size() == 2) break; }
+        if (ls.isEmpty()) return null;
+        String a = ls.get(0);
+        if ((a.endsWith(",") || a.endsWith("-")) && ls.size() > 1) a = a + " " + ls.get(1);
+        a = a.replaceAll("[,\\s-]+$", "");
+        if (a.length() < 6 || a.contains("R$") || LEG.matcher(a).find()) return null;
+        return a;
     }
 }

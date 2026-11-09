@@ -52,4 +52,19 @@ public class OfferParserTest {
         assertNotNull(o);
         assertEquals(5.6, o.totalKm(), 1e-9);
     }
+
+    @Test public void destinoUber() {
+        OfferParser.Offer o = OfferParser.parse("UberX\nR$ 10,36\n6 min (2.4 km)\nRua Henrique Fraeb, Partenon, Porto Alegre\n13 minutos (5.7 km)\n"
+                + "Av. Fábio Araújo Santos, 1188, Nonoai, Porto Alegre\nTenho interesse");
+        assertEquals("Av. Fábio Araújo Santos, 1188, Nonoai, Porto Alegre", o.destination);
+    }
+    @Test public void destinoQuebradoPeloOcr() {
+        OfferParser.Offer o = OfferParser.parse("R$ 7,04\n5 min (1.3 km)\nPraça X, Santana\n9 minutos (3.3 km)\n"
+                + "Av. Aureliano de Figueiredo Pinto, 105 - Bairro, Praia de Belas,\nPorto Alegre\nTenho interesse");
+        assertEquals("Av. Aureliano de Figueiredo Pinto, 105 - Bairro, Praia de Belas, Porto Alegre", o.destination);
+    }
+    @Test public void destino99() {
+        OfferParser.Offer o = OfferParser.parse("R$8,90\n6 min (1,2 km)\nRua Barão do Triunfo, 707, Azenha\n13 min (4,4 km)\nRua Garibaldi, 712, Floresta\nTentando encontrar");
+        assertEquals("Rua Garibaldi, 712, Floresta", o.destination);
+    }
 }

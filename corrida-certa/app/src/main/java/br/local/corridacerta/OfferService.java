@@ -108,12 +108,14 @@ public class OfferService extends AccessibilityService {
             lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
             OfferParser.Offer o = OfferParser.parse(text);
             if (o == null) { // leitura por acessibilidade não achou corrida: tenta ler o print da tela (OCR)
+                checkAccepted(text);
                 ocrPending = true;
                 ocrScan();
             }
             if (o != null) {
                 found = true;
                 lastTreeHit = System.currentTimeMillis();
+                rememberOffer(o);
                 if (!text.equals(lastShownText)) {
                     lastShownText = text;
                     settings.setLastRaw(text);
@@ -135,6 +137,28 @@ public class OfferService extends AccessibilityService {
     // ---- Leitura por print + OCR (para apps que escondem o texto da acessibilidade, como a 99) ----
     private static boolean looksLikeOffer(String s) {
         return s.matches("(?is).*min\\w*\\s*[(\\[]\\s*[0-9][0-9.,]*\\s*(km|m)\\s*[)\\]].*");
+    }
+
+    private String pendingDest = "";
+    private long pendingAt;
+
+    private void rememberOffer(OfferParser.Offer o) {
+        if (o.destination == null) return;
+        pendingDest = o.destination;
+        pendingAt = System.currentTimeMillis();
+        settings.setLastOffer(o.destination, pendingAt);
+    }
+
+    /** Se a oferta sumiu há pouco e a tela mostra uma corrida em andamento, considera aceita. */
+    private void checkAccepted(String text) {
+        if (pendingDest.isEmpty()) return;
+        long age = System.currentTimeMillis() - pendingAt;
+        if (age > 90000) { pendingDest = ""; return; }
+        if (age < 1500) return;
+        if (text.matches("(?is).*(Encerrar|Iniciar viagem|Iniciar corrida|Cheguei|Finalizar|Destino de ).*")) {
+            settings.setAccepted(pendingDest, System.currentTimeMillis());
+            pendingDest = "";
+        }
     }
 
     private long lastTreeHit;
@@ -199,9 +223,13 @@ public class OfferService extends AccessibilityService {
                         o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
                 showCard(o);
             }
+            rememberOffer(o);
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
-        } else if (System.currentTimeMillis() - lastTreeHit > 2500) {
+        } else {
+            checkAccepted(text);
+        }
+        if (o == null && System.currentTimeMillis() - lastTreeHit > 2500) {
             lastShownText = "";
             removeCard();
         }

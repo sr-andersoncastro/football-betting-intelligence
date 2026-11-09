@@ -34,7 +34,8 @@ public class MainActivity extends Activity {
 
     private Settings s;
     private LinearLayout statusCard;
-    private TextView statusTitle, statusSub, lastResult, lastRaw, diagText;
+    private TextView statusTitle, statusSub, lastResult, lastRaw, diagText, destTitle, destAddr;
+    private Button mapsBtn;
     private Button activate;
 
     @Override protected void onCreate(Bundle b) {
@@ -70,6 +71,18 @@ public class MainActivity extends Activity {
         statusCard.addView(label("Em Acessibilidade > Apps instalados > Corrida Certa > Ligar.\nSe estiver bloqueado: Info do app > ⋮ > Permitir configurações restritas.", 12, MUTED, false), lp(10));
         space(root, 14);
 
+        LinearLayout dest = card(root);
+        destTitle = label("Destino do passageiro", 18, TEXT, true);
+        dest.addView(destTitle);
+        destAddr = label("", 15, TEXT, false);
+        dest.addView(destAddr, lp(6));
+        mapsBtn = button("Abrir no Google Maps", GREEN, Color.parseColor("#06260F"));
+        mapsBtn.setOnClickListener(v -> openMaps());
+        dest.addView(mapsBtn, lp(12));
+        Button clear = button("Apagar dados capturados", FIELD, TEXT);
+        clear.setOnClickListener(v -> { s.clearTrips(); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
+        dest.addView(clear, lp(8));
+        space(root, 14);
         LinearLayout dg = card(root);
         dg.addView(label("Diagnóstico", 18, TEXT, true));
         diagText = label("", 11, MUTED, false);
@@ -144,9 +157,29 @@ public class MainActivity extends Activity {
                              : "Ligue o serviço de acessibilidade para o app conseguir ler as corridas.");
         activate.setVisibility(on ? View.GONE : View.VISIBLE);
         lastResult.setText(s.lastResult());
+        String dest = currentDest();
+        boolean hasAcc = !s.acceptedDest().isEmpty() && s.acceptedAt() >= s.lastOfferAt() - 120000;
+        destTitle.setText(hasAcc ? "Destino do passageiro (corrida aceita)" : "Destino da última oferta vista");
+        destAddr.setText(dest.isEmpty() ? "Nenhuma corrida lida ainda." : dest);
+        mapsBtn.setVisibility(dest.isEmpty() ? View.GONE : View.VISIBLE);
         diagText.setText("Serviço ligado no Android: " + (on ? "sim" : "NÃO") + "\n" + s.diag());
         String raw = s.lastRaw();
         lastRaw.setText(raw.isEmpty() ? "(nada capturado ainda)" : raw);
+    }
+
+    private String currentDest() {
+        boolean hasAcc = !s.acceptedDest().isEmpty() && s.acceptedAt() >= s.lastOfferAt() - 120000;
+        return hasAcc ? s.acceptedDest() : s.lastOfferDest();
+    }
+
+    private void openMaps() {
+        String dest = currentDest();
+        if (dest.isEmpty()) return;
+        android.net.Uri uri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + android.net.Uri.encode(dest));
+        Intent i = new Intent(Intent.ACTION_VIEW, uri);
+        i.setPackage("com.google.android.apps.maps");
+        try { startActivity(i); }
+        catch (android.content.ActivityNotFoundException e) { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
     }
 
     private boolean serviceEnabled() {
