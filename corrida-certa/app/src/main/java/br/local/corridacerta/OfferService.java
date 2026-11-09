@@ -105,14 +105,15 @@ public class OfferService extends AccessibilityService {
             if (text.contains("R$") && text.contains("km")) {
                 lastOfferInfo = pkg + " às " + now() + ", " + text.length() + " caracteres:\n" + (text.length() > 700 ? text.substring(0, 700) : text);
             }
-            if (pkg.equals(APP99) && text.trim().length() < 30) { // 99 não expõe o texto: lê o print da tela
+            lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
+            OfferParser.Offer o = OfferParser.parse(text);
+            if (o == null) { // leitura por acessibilidade não achou corrida: tenta ler o print da tela (OCR)
                 ocrPending = true;
                 ocrScan();
             }
-            lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
-            OfferParser.Offer o = OfferParser.parse(text);
             if (o != null) {
                 found = true;
+                lastTreeHit = System.currentTimeMillis();
                 if (!text.equals(lastShownText)) {
                     lastShownText = text;
                     settings.setLastRaw(text);
@@ -132,6 +133,7 @@ public class OfferService extends AccessibilityService {
     }
 
     // ---- Leitura por print + OCR (para apps que escondem o texto da acessibilidade, como a 99) ----
+    private long lastTreeHit;
     private boolean ocrBusy;
     private long lastOcr;
     private String ocrInfo = "(OCR ainda não usado)";
@@ -189,13 +191,13 @@ public class OfferService extends AccessibilityService {
             if (!key.equals(lastShownText)) {
                 lastShownText = key;
                 settings.setLastRaw(text);
-                settings.setLastResult(String.format(Locale.US, "99 (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
+                settings.setLastResult(String.format(Locale.US, "Uber/99 (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
                         o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
                 showCard(o);
             }
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
-        } else {
+        } else if (System.currentTimeMillis() - lastTreeHit > 2500) {
             lastShownText = "";
             removeCard();
         }
