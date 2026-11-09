@@ -66,16 +66,46 @@ public final class OfferParser {
         return unit.equalsIgnoreCase("m") ? v / 1000.0 : v;
     }
 
-    /** Primeira linha de endereço depois do trecho da viagem; junta a linha seguinte se a primeira termina em vírgula/hífen (quebra do OCR). */
+    private static final Pattern ADDR = Pattern.compile(
+            "(?i)^(r\\.?|rua|av\\.?|avenida|tv\\.?|travessa|al\\.?|alameda|estr\\.?|estrada|pra[çc]a|p[çc]a\\.?|rod\\.?|rodovia|largo|beco|servid[ãa]o)\\s+\\S.*|^.*[A-Za-zÀ-ú]\\s*,\\s*[0-9]+.*");
+
+    private static boolean isAddress(String s) {
+        return s.length() >= 6 && s.length() <= 140 && !s.contains("R$") && !LEG.matcher(s).find() && ADDR.matcher(s).matches();
+    }
+
+    /**
+     * Endereço de destino: primeira linha que PARECE endereço depois do trecho da viagem (ignora textos da interface
+     * como "Filtro avançado"). Se não houver, usa o último endereço do card quando houver dois. Senão null.
+     */
     static String addressAfter(String text, int from) {
-        String[] lines = text.substring(from).split("\\R");
-        java.util.List<String> ls = new ArrayList<>();
-        for (String s : lines) { s = s.trim(); if (!s.isEmpty()) ls.add(s); if (ls.size() == 2) break; }
-        if (ls.isEmpty()) return null;
-        String a = ls.get(0);
-        if ((a.endsWith(",") || a.endsWith("-")) && ls.size() > 1) a = a + " " + ls.get(1);
-        a = a.replaceAll("[,\\s-]+$", "");
-        if (a.length() < 6 || a.contains("R$") || LEG.matcher(a).find()) return null;
+        java.util.List<String> lines = new ArrayList<>();
+        java.util.List<Integer> starts = new ArrayList<>();
+        Matcher m = Pattern.compile("[^\\r\\n]+").matcher(text);
+        while (m.find()) { lines.add(m.group().trim()); starts.add(m.start()); }
+        // resto da própria linha do trecho ("13 min (4,4 km) Rua X")
+        for (int i = 0; i < lines.size(); i++) {
+            int end = starts.get(i) + (lines.get(i).isEmpty() ? 0 : text.indexOf(lines.get(i), starts.get(i)) - starts.get(i)) + lines.get(i).length();
+            if (starts.get(i) <= from && from <= end + 1) {
+                String rem = text.substring(Math.min(from, text.length()), Math.min(end, text.length())).replaceAll("^[\\s,•·-]+", "").trim();
+                if (isAddress(rem)) return clean(rem);
+                break;
+            }
+        }
+        java.util.List<Integer> cand = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) if (!lines.get(i).isEmpty() && isAddress(lines.get(i))) cand.add(i);
+        for (int i : cand) {
+            if (starts.get(i) >= from) return clean(joinWrapped(lines, i));
+        }
+        if (cand.size() >= 2) return clean(joinWrapped(lines, cand.get(cand.size() - 1)));
+        return null;
+    }
+
+    /** Junta a linha seguinte quando o endereço termina em vírgula/hífen (quebra de linha do OCR). */
+    private static String joinWrapped(java.util.List<String> lines, int i) {
+        String a = lines.get(i);
+        if ((a.endsWith(",") || a.endsWith("-")) && i + 1 < lines.size() && !lines.get(i + 1).isEmpty()) a = a + " " + lines.get(i + 1);
         return a;
     }
+
+    private static String clean(String a) { return a.replaceAll("[,\\s-]+$", ""); }
 }

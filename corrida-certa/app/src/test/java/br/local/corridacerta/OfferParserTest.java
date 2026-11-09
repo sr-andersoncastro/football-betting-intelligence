@@ -67,4 +67,18 @@ public class OfferParserTest {
         OfferParser.Offer o = OfferParser.parse("R$8,90\n6 min (1,2 km)\nRua Barão do Triunfo, 707, Azenha\n13 min (4,4 km)\nRua Garibaldi, 712, Floresta\nTentando encontrar");
         assertEquals("Rua Garibaldi, 712, Floresta", o.destination);
     }
+
+    @Test public void ignoraTextoDeInterfaceNoDestino() {
+        OfferParser.Offer o = OfferParser.parse("UberX\nR$ 18,25\nEst. de R$1,5/km\n5 min (2.0 km)\nRua Pedro Alves, Centro\n"
+                + "14 minutos (7.2 km)\nFiltro avançado\nRua Dom Pedro II, 1240, Higienópolis, Porto Alegre\nTenho interesse");
+        assertEquals("Rua Dom Pedro II, 1240, Higienópolis, Porto Alegre", o.destination);
+    }
+    @Test public void semEnderecoClaroRetornaNull() {
+        OfferParser.Offer o = OfferParser.parse("R$ 28,90\n4 min (1,0 km)\n20 min (9,0 km)\nFiltro avançado");
+        assertNull(o.destination);
+    }
+    @Test public void enderecoNaMesmaLinhaDoTrecho() {
+        OfferParser.Offer o = OfferParser.parse("R$ 9,00\n3 min (1 km)\n10 min (4 km) Rua das Flores, 55, Centro");
+        assertEquals("Rua das Flores, 55, Centro", o.destination);
+    }
 }
