@@ -35,6 +35,7 @@ public class OfferService extends AccessibilityService {
 
     @Override protected void onServiceConnected() {
         settings = new Settings(this);
+        store = new Store(this);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         connectedAt = now();
         diag("Serviço conectado.");
@@ -110,12 +111,12 @@ public class OfferService extends AccessibilityService {
             if (o == null) { // leitura por acessibilidade não achou corrida: tenta ler o print da tela (OCR)
                 checkAccepted(text);
                 ocrPending = true;
-                ocrScan();
+                ocrScan(pkg);
             }
             if (o != null) {
                 found = true;
                 lastTreeHit = System.currentTimeMillis();
-                rememberOffer(o);
+                rememberOffer(o, pkg.equals(UBER) ? "Uber" : "99");
                 if (!text.equals(lastShownText)) {
                     lastShownText = text;
                     settings.setLastRaw(text);
@@ -139,10 +140,13 @@ public class OfferService extends AccessibilityService {
         return s.matches("(?is).*min\\w*\\s*[(\\[]\\s*[0-9][0-9.,]*\\s*(km|m)\\s*[)\\]].*");
     }
 
+    private Store store;
+    private String ocrPkg = UBER;
     private String pendingDest = "";
     private long pendingAt;
 
-    private void rememberOffer(OfferParser.Offer o) {
+    private void rememberOffer(OfferParser.Offer o, String platform) {
+        try { store.add(platform, o, System.currentTimeMillis()); } catch (Exception ex) { Log.e(TAG, "historico", ex); }
         if (o.destination == null) return;
         pendingDest = o.destination;
         pendingAt = System.currentTimeMillis();
@@ -157,6 +161,7 @@ public class OfferService extends AccessibilityService {
         if (age < 1500) return;
         if (text.matches("(?is).*(Encerrar|Iniciar viagem|Iniciar corrida|Cheguei|Finalizar|Destino de ).*")) {
             settings.setAccepted(pendingDest, System.currentTimeMillis());
+            try { store.markAccepted(pendingDest, pendingAt - 5000); } catch (Exception ex) { Log.e(TAG, "historico", ex); }
             pendingDest = "";
         }
     }
@@ -167,7 +172,8 @@ public class OfferService extends AccessibilityService {
     private String ocrInfo = "(OCR ainda não usado)";
     private com.google.mlkit.vision.text.TextRecognizer recognizer;
 
-    private void ocrScan() {
+    private void ocrScan(String pkg) {
+        ocrPkg = pkg;
         long t = System.currentTimeMillis();
         if (ocrBusy || t - lastOcr < 1200) return;
         ocrBusy = true;
@@ -223,7 +229,7 @@ public class OfferService extends AccessibilityService {
                         o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
                 showCard(o);
             }
-            rememberOffer(o);
+            rememberOffer(o, ocrPkg.equals(UBER) ? "Uber" : "99");
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
         } else {

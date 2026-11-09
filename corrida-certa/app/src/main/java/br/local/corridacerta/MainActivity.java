@@ -36,6 +36,13 @@ public class MainActivity extends Activity {
     private LinearLayout statusCard;
     private TextView statusTitle, statusSub, lastResult, lastRaw, diagText, destTitle, destAddr;
     private Button mapsBtn;
+    private android.widget.FrameLayout content;
+    private ScrollView homeView, historyView;
+    private LinearLayout historyList;
+    private Button tabHome, tabHistory;
+    private String filter = null; // null = todos
+    private long expandedId = -1;
+    private boolean onHistory;
     private Button activate;
 
     @Override protected void onCreate(Bundle b) {
@@ -80,7 +87,7 @@ public class MainActivity extends Activity {
         mapsBtn.setOnClickListener(v -> openMaps());
         dest.addView(mapsBtn, lp(12));
         Button clear = button("Apagar dados capturados", FIELD, TEXT);
-        clear.setOnClickListener(v -> { s.clearTrips(); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
+        clear.setOnClickListener(v -> { s.clearTrips(); new Store(this).clear(); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
         dest.addView(clear, lp(8));
         space(root, 14);
         LinearLayout dg = card(root);
@@ -144,7 +151,151 @@ public class MainActivity extends Activity {
         last.addView(toggle, lp(12));
         last.addView(lastRaw, lp(8));
 
-        setContentView(sv);
+        homeView = sv;
+        buildHistory();
+
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setBackgroundColor(BG);
+        content = new android.widget.FrameLayout(this);
+        outer.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setBackgroundColor(CARD);
+        nav.setPadding(dp(10), dp(8), dp(10), dp(8));
+        tabHome = tab("Início", false);
+        tabHistory = tab("Histórico", true);
+        nav.addView(tabHome, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        nav.addView(tabHistory, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        outer.addView(nav);
+        setContentView(outer);
+        showTab(false);
+    }
+
+    private Button tab(String name, boolean history) {
+        Button b = button(name, CARD, MUTED);
+        b.setMinHeight(dp(44));
+        b.setOnClickListener(v -> showTab(history));
+        return b;
+    }
+
+    private void showTab(boolean history) {
+        onHistory = history;
+        content.removeAllViews();
+        content.addView(history ? historyView : homeView);
+        tabHome.setBackground(rounded(history ? CARD : FIELD, 14, 0));
+        tabHome.setTextColor(history ? MUTED : GREEN);
+        tabHistory.setBackground(rounded(history ? FIELD : CARD, 14, 0));
+        tabHistory.setTextColor(history ? GREEN : MUTED);
+        if (history) refreshHistory();
+    }
+
+    // ---- Histórico de ofertas ----
+    private void buildHistory() {
+        historyView = new ScrollView(this);
+        historyView.setBackgroundColor(BG);
+        LinearLayout h = new LinearLayout(this);
+        h.setOrientation(LinearLayout.VERTICAL);
+        h.setPadding(dp(18), dp(36), dp(18), dp(18));
+        historyView.addView(h);
+        h.addView(label("Histórico de Ofertas", 26, TEXT, true));
+
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        String[][] f = {{"Todos", null}, {"99", "99"}, {"Uber", "Uber"}};
+        for (String[] x : f) {
+            Button c = button(x[0], FIELD, TEXT);
+            c.setMinHeight(dp(40));
+            c.setTextSize(14);
+            final String val = x[1];
+            c.setOnClickListener(v -> { filter = val; expandedId = -1; refreshHistory(); });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            lp.rightMargin = dp(8);
+            chips.addView(c, lp);
+        }
+        h.addView(chips, lp(12));
+        historyList = new LinearLayout(this);
+        historyList.setOrientation(LinearLayout.VERTICAL);
+        h.addView(historyList, lp(12));
+    }
+
+    private void refreshHistory() {
+        historyList.removeAllViews();
+        java.util.List<Store.Row> rows = new Store(this).list(filter, 200);
+        if (rows.isEmpty()) {
+            historyList.addView(label("Nenhuma oferta lida ainda. Elas aparecem aqui quando chegam na Uber ou na 99.", 14, MUTED, false));
+            return;
+        }
+        for (Store.Row r : rows) historyList.addView(historyRow(r), lp(10));
+    }
+
+    private View historyRow(Store.Row r) {
+        boolean kmOk = r.perKm() >= s.minPerKm(), hourOk = r.perHour() >= s.minPerHour();
+        int dot = kmOk && hourOk ? GREEN : (!kmOk && !hourOk ? RED : AMBER);
+        boolean open = r.id == expandedId;
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(14), dp(12), dp(14), dp(12));
+        box.setBackground(rounded(CARD, 16, open ? dot : 0));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView badge = label(r.platform.equals("99") ? "99" : "Uber", 14, r.platform.equals("99") ? Color.BLACK : Color.WHITE, true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(rounded(r.platform.equals("99") ? Color.parseColor("#FFD400") : Color.parseColor("#000000"), 24, r.platform.equals("99") ? 0 : MUTED));
+        top.addView(badge, new LinearLayout.LayoutParams(dp(52), dp(52)));
+
+        LinearLayout mid = new LinearLayout(this);
+        mid.setOrientation(LinearLayout.VERTICAL);
+        mid.setPadding(dp(12), 0, dp(8), 0);
+        mid.addView(label(String.format(Locale.US, "R$ %.2f", r.value).replace('.', ','), 20, TEXT, true));
+        if (!open) mid.addView(label(r.dest.isEmpty() ? "(endereço não lido)" : r.dest, 13, MUTED, false));
+        top.addView(mid, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setGravity(Gravity.END);
+        right.addView(label(ago(r.at), 12, MUTED, false));
+        right.addView(label((r.accepted ? "✔ aceita  " : "") + "●", 14, dot, true));
+        top.addView(right);
+        box.addView(top);
+
+        if (open) {
+            box.addView(label(new java.text.SimpleDateFormat("d 'de' MMMM 'de' yyyy, HH:mm", new Locale("pt", "BR")).format(new java.util.Date(r.at)), 13, MUTED, false), lp(6));
+            LinearLayout chips = new LinearLayout(this);
+            chips.setOrientation(LinearLayout.HORIZONTAL);
+            String[] v = {String.format(Locale.US, "R$ %.2f/km", r.perKm()), String.format(Locale.US, "R$ %.2f/h", r.perHour()), String.format(Locale.US, "R$ %.2f/min", r.perMin())};
+            for (String x : v) {
+                TextView c = label(x.replace('.', ','), 13, TEXT, true);
+                c.setGravity(Gravity.CENTER);
+                c.setBackground(rounded(FIELD, 10, 0));
+                c.setPadding(dp(4), dp(10), dp(4), dp(10));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                lp.rightMargin = dp(6);
+                chips.addView(c, lp);
+            }
+            box.addView(chips, lp(12));
+            box.addView(label(String.format(Locale.US, "%.0f minutos e %.1f km para o embarque", r.pickupMin, r.pickupKm).replace('.', ','), 14, TEXT, false), lp(12));
+            box.addView(label(String.format(Locale.US, "%.0f minutos e %.1f km para o desembarque", r.tripMin, r.tripKm).replace('.', ','), 14, TEXT, false), lp(4));
+            if (!r.dest.isEmpty()) {
+                box.addView(label(r.dest, 15, TEXT, true), lp(10));
+                Button maps = button("Abrir no Google Maps", GREEN, Color.parseColor("#06260F"));
+                maps.setOnClickListener(x -> openMapsTo(r.dest));
+                box.addView(maps, lp(10));
+            }
+        }
+        box.setOnClickListener(x -> { expandedId = open ? -1 : r.id; refreshHistory(); });
+        return box;
+    }
+
+    private static String ago(long at) {
+        long m = (System.currentTimeMillis() - at) / 60000;
+        if (m < 1) return "agora";
+        if (m < 60) return m + " min atrás";
+        if (m < 1440) return (m / 60) + " h atrás";
+        return (m / 1440) + " d atrás";
     }
 
     @Override protected void onResume() {
@@ -156,6 +307,7 @@ public class MainActivity extends Activity {
         statusSub.setText(on ? "Abra a Uber ou a 99 e aguarde uma corrida. O cartão aparece no topo da tela."
                              : "Ligue o serviço de acessibilidade para o app conseguir ler as corridas.");
         activate.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (onHistory) refreshHistory();
         lastResult.setText(s.lastResult());
         String dest = currentDest();
         boolean hasAcc = !s.acceptedDest().isEmpty() && s.acceptedAt() >= s.lastOfferAt() - 120000;
@@ -172,9 +324,10 @@ public class MainActivity extends Activity {
         return hasAcc ? s.acceptedDest() : s.lastOfferDest();
     }
 
-    private void openMaps() {
-        String dest = currentDest();
-        if (dest.isEmpty()) return;
+    private void openMaps() { openMapsTo(currentDest()); }
+
+    private void openMapsTo(String dest) {
+        if (dest == null || dest.isEmpty()) return;
         android.net.Uri uri = android.net.Uri.parse("https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + android.net.Uri.encode(dest));
         Intent i = new Intent(Intent.ACTION_VIEW, uri);
         i.setPackage("com.google.android.apps.maps");
