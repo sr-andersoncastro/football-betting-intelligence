@@ -362,7 +362,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildMap(LinearLayout parent, java.util.List<Stats.RegionStat> regs) {
-        org.osmdroid.config.Configuration cfg = org.osmdroid.config.Configuration.getInstance();
+        org.osmdroid.config.IConfigurationProvider cfg = org.osmdroid.config.Configuration.getInstance();
         cfg.setUserAgentValue(getPackageName());
         cfg.setOsmdroidBasePath(new java.io.File(getCacheDir(), "osmdroid"));
         cfg.setOsmdroidTileCache(new java.io.File(getCacheDir(), "osmdroid/tiles"));
