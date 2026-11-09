@@ -86,20 +86,6 @@ public class MainActivity extends Activity {
         clear.setOnClickListener(v -> { s.clearTrips(); new Store(this).clear(); Store.deleteAllPrints(this); onResume(); Toast.makeText(this, "Dados apagados", Toast.LENGTH_SHORT).show(); });
         dataCard.addView(clear, lp(12));
         space(root, 14);
-        LinearLayout dg = card(root);
-        dg.addView(label("Diagnóstico", 18, TEXT, true));
-        diagText = label("", 11, MUTED, false);
-        dg.addView(diagText, lp(8));
-        Button copy = button("Copiar diagnóstico", FIELD, TEXT);
-        copy.setOnClickListener(v -> {
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("diagnostico", diagText.getText()));
-            Toast.makeText(this, "Copiado. Cole na conversa.", Toast.LENGTH_SHORT).show();
-        });
-        dg.addView(copy, lp(12));
-
-        space(root, 14);
-
         // Metas
         LinearLayout goals = card(root);
         goals.addView(label("Suas metas", 18, TEXT, true));
@@ -135,17 +121,39 @@ public class MainActivity extends Activity {
         goals.addView(save, lp(16));
         space(root, 14);
 
-        // Última leitura
-        LinearLayout last = card(root);
-        last.addView(label("Última corrida lida", 18, TEXT, true));
-        lastResult = label("", 15, TEXT, false);
-        last.addView(lastResult, lp(8));
-        Button toggle = button("Ver texto capturado (diagnóstico)", FIELD, TEXT);
+        space(root, 14);
+        // Diagnóstico: escondido por padrão, expande ao tocar
+        LinearLayout dg = card(root);
+        Button dgToggle = button("Diagnóstico (avançado)  ▾", FIELD, TEXT);
+        dg.addView(dgToggle);
+        LinearLayout dgBody = new LinearLayout(this);
+        dgBody.setOrientation(LinearLayout.VERTICAL);
+        dgBody.setVisibility(View.GONE);
+        dg.addView(dgBody);
+        dgToggle.setOnClickListener(v -> {
+            boolean open = dgBody.getVisibility() == View.GONE;
+            dgBody.setVisibility(open ? View.VISIBLE : View.GONE);
+            dgToggle.setText(open ? "Diagnóstico (avançado)  ▴" : "Diagnóstico (avançado)  ▾");
+        });
+        diagText = label("", 11, MUTED, false);
+        dgBody.addView(diagText, lp(12));
+        Button copy = button("Copiar diagnóstico", FIELD, TEXT);
+        copy.setOnClickListener(v -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("diagnostico", diagText.getText()));
+            Toast.makeText(this, "Copiado. Cole na conversa.", Toast.LENGTH_SHORT).show();
+        });
+        dgBody.addView(copy, lp(12));
+        dgBody.addView(label("Última corrida lida", 15, TEXT, true), lp(14));
+        lastResult = label("", 14, TEXT, false);
+        dgBody.addView(lastResult, lp(4));
+        Button toggle = button("Ver texto capturado", FIELD, TEXT);
         lastRaw = label("", 11, MUTED, false);
         lastRaw.setVisibility(View.GONE);
         toggle.setOnClickListener(v -> lastRaw.setVisibility(lastRaw.getVisibility() == View.GONE ? View.VISIBLE : View.GONE));
-        last.addView(toggle, lp(12));
-        last.addView(lastRaw, lp(8));
+        dgBody.addView(toggle, lp(10));
+        dgBody.addView(lastRaw, lp(8));
+        space(root, 14);
 
         homeView = sv; // aba Ferramentas
         buildHistory();
