@@ -7,6 +7,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.graphics.Bitmap;
+import android.hardware.HardwareBuffer;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -49,6 +52,7 @@ public class OfferService extends AccessibilityService {
                 + "\nApps que geraram eventos: " + pkgsSeen
                 + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
                 + "\nÚltimo texto com R$ e km: " + lastOfferInfo
+                + "\nOCR: " + ocrInfo
                 + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
 
@@ -76,6 +80,7 @@ public class OfferService extends AccessibilityService {
     private void scanWindows() {
         scanPending = false;
         boolean found = false;
+        boolean ocrPending = false;
         scans++;
         java.util.List<AccessibilityWindowInfo> wins = getWindows();
         StringBuilder wl = new StringBuilder();
@@ -100,6 +105,10 @@ public class OfferService extends AccessibilityService {
             if (text.contains("R$") && text.contains("km")) {
                 lastOfferInfo = pkg + " às " + now() + ", " + text.length() + " caracteres:\n" + (text.length() > 700 ? text.substring(0, 700) : text);
             }
+            if (pkg.equals(APP99) && text.trim().length() < 30) { // 99 não expõe o texto: lê o print da tela
+                ocrPending = true;
+                ocrScan();
+            }
             lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
             OfferParser.Offer o = OfferParser.parse(text);
             if (o != null) {
@@ -119,7 +128,78 @@ public class OfferService extends AccessibilityService {
             }
         }
         diag(found ? "Corrida reconhecida." : "Nenhuma corrida reconhecida neste momento.");
-        if (!found) { lastShownText = ""; removeCard(); }
+        if (!found && !ocrPending) { lastShownText = ""; removeCard(); }
+    }
+
+    // ---- Leitura por print + OCR (para apps que escondem o texto da acessibilidade, como a 99) ----
+    private boolean ocrBusy;
+    private long lastOcr;
+    private String ocrInfo = "(OCR ainda não usado)";
+    private com.google.mlkit.vision.text.TextRecognizer recognizer;
+
+    private void ocrScan() {
+        long t = System.currentTimeMillis();
+        if (ocrBusy || t - lastOcr < 1200) return;
+        ocrBusy = true;
+        lastOcr = t;
+        if (recognizer == null) {
+            recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
+                    com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
+        }
+        try {
+            takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
+                @Override public void onSuccess(ScreenshotResult r) {
+                    Bitmap bmp = null;
+                    try {
+                        HardwareBuffer hb = r.getHardwareBuffer();
+                        Bitmap hw = Bitmap.wrapHardwareBuffer(hb, r.getColorSpace());
+                        bmp = hw.copy(Bitmap.Config.ARGB_8888, false);
+                        hw.recycle();
+                        hb.close();
+                    } catch (Exception ex) {
+                        ocrBusy = false;
+                        ocrInfo = "erro ao converter print: " + ex;
+                        diag("");
+                        return;
+                    }
+                    final Bitmap img = bmp;
+                    recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(img, 0))
+                            .addOnSuccessListener(res -> { ocrBusy = false; img.recycle(); onOcrText(res.getText()); })
+                            .addOnFailureListener(ex -> { ocrBusy = false; img.recycle(); ocrInfo = "OCR falhou: " + ex; diag(""); });
+                }
+                @Override public void onFailure(int code) {
+                    ocrBusy = false;
+                    ocrInfo = "print falhou, código " + code + " (" + now() + ")";
+                    diag("");
+                }
+            });
+        } catch (Exception ex) {
+            ocrBusy = false;
+            ocrInfo = "takeScreenshot erro: " + ex;
+            diag("");
+        }
+    }
+
+    private void onOcrText(String text) {
+        ocrInfo = now() + ", " + text.length() + " caracteres:\n" + (text.length() > 500 ? text.substring(0, 500) : text);
+        if (text.contains("R$") && text.contains("km")) lastOfferInfo = "OCR " + ocrInfo;
+        OfferParser.Offer o = OfferParser.parse(text);
+        if (o != null) {
+            String key = String.format(Locale.US, "%.2f|%.1f|%.1f", o.value, o.pickupKm, o.tripKm);
+            if (!key.equals(lastShownText)) {
+                lastShownText = key;
+                settings.setLastRaw(text);
+                settings.setLastResult(String.format(Locale.US, "99 (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
+                        o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
+                showCard(o);
+            }
+            handler.removeCallbacks(hide);
+            handler.postDelayed(hide, 20000);
+        } else {
+            lastShownText = "";
+            removeCard();
+        }
+        diag(o != null ? "Corrida reconhecida (OCR)." : "OCR sem corrida.");
     }
 
     private void read(AccessibilityNodeInfo n, StringBuilder sb, int depth) {

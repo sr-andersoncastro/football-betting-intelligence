@@ -37,4 +37,19 @@ public class OfferParserTest {
         assertNull(OfferParser.parse("Você está online\nR$ 12,00 hoje"));
         assertNull(OfferParser.parse(null));
     }
+
+    @Test public void card99() {
+        OfferParser.Offer o = OfferParser.parse("Pgto. no app\nR$8,90\nR$1,58/km\nR$3,34 Tarifa base dinâmica incl.\n4,73 16 corridas\n"
+                + "6 min (1,2 km)\nRua Barão do Triunfo, 707\n13 min (4,4 km)\nRua Garibaldi, 712");
+        assertNotNull(o);
+        assertEquals(8.90, o.value, 1e-9);
+        assertEquals(5.6, o.totalKm(), 1e-9);
+        assertEquals(1.59, o.perKm(), 0.005);
+        assertEquals(28.11, o.perHour(), 0.005);
+    }
+    @Test public void ocrComErrosComuns() {
+        OfferParser.Offer o = OfferParser.parse("RS8,90\n6 min [1,2 km)\n13 min (4,4 km]");
+        assertNotNull(o);
+        assertEquals(5.6, o.totalKm(), 1e-9);
+    }
 }

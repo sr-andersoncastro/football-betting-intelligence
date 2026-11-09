@@ -25,10 +25,10 @@ public final class OfferParser {
 
     // R$ 20,08 | R$14,80 | R$ 1.234,56 — ignora "R$2,21/km" e "R$30,62/hr" (valores já calculados por outros apps)
     private static final Pattern MONEY = Pattern.compile(
-            "R\\$\\s*([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})(?![0-9,])(?!\\s*/)");
+            "R[$S]\\s*([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2}|[0-9]+,[0-9]{2})(?![0-9,])(?!\\s*/)");
     // "4 min (1.1 km)", "34 minutos (11.2 km)", "10min (1,8km)", "1 h 5 min (30 km)", "2 min (350 m)"
     private static final Pattern LEG = Pattern.compile(
-            "(?i)(?:([0-9]+)\\s*h(?:oras?)?\\s*)?([0-9]+)\\s*min(?:utos?)?\\s*\\(\\s*([0-9]+(?:[.,][0-9]+)?)\\s*(km|m)\\s*\\)");
+            "(?i)(?:([0-9]+)\\s*h(?:oras?)?\\s*)?([0-9]+)\\s*min(?:utos?)?\\s*[(\\[]\\s*([0-9]+(?:[.,][0-9]+)?)\\s*(km|m)\\s*[)\\]]");
     private static final Pattern HOURS_ONLY = Pattern.compile(
             "(?i)([0-9]+)\\s*h(?:oras?)?\\s*\\(\\s*([0-9]+(?:[.,][0-9]+)?)\\s*(km|m)\\s*\\)");
 
