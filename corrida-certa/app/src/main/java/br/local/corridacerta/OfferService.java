@@ -11,6 +11,7 @@ import android.graphics.Bitmap;
 import android.hardware.HardwareBuffer;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -296,20 +297,27 @@ public class OfferService extends AccessibilityService {
         int cat = settings.category(o.perKm()); // 0 ruim, 1 média, 2 boa (pelo R$/km)
         int color = cat == 2 ? Color.rgb(27, 143, 76) : (cat == 0 ? Color.rgb(198, 40, 40) : Color.rgb(230, 140, 0));
 
-        card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16), dp(10), dp(16), dp(10));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(10), dp(16), dp(10));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(color);
         bg.setCornerRadius(dp(14));
-        card.setBackground(bg);
+        box.setBackground(bg);
 
         TextView l1 = line(String.format(Locale.US, "R$ %.2f/km   R$ %.2f/h", o.perKm(), o.perHour()), 20, true);
         TextView l2 = line(String.format(Locale.US, "%.1f km · %.0f min%s", o.totalKm(), o.totalMin(), o.bundle ? " · pacote" : ""), 13, false);
         TextView l0 = line(cat == 2 ? "Corrida boa" : (cat == 0 ? "Corrida ruim" : "Corrida média"), 14, true);
-        card.addView(l0);
-        card.addView(l1);
-        card.addView(l2);
+        box.addView(l0);
+        box.addView(l1);
+        box.addView(l2);
+
+        // contêiner transparente: figurinha animada em cima do cartão (só quando a corrida é boa)
+        card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        if (cat == 2) addSticker(card, R.raw.sticker_boa, 190, 105);
+        card.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
@@ -320,6 +328,27 @@ public class OfferService extends AccessibilityService {
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.y = dp(80);
         try { wm.addView(card, lp); } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
+    }
+
+    /** Figurinha (GIF animado) acima do cartão. Se não conseguir animar, não mostra nada (o cartão continua normal). */
+    private void addSticker(LinearLayout parent, int resId, int wDp, int hDp) {
+        try {
+            android.graphics.drawable.Drawable d = android.graphics.ImageDecoder.decodeDrawable(
+                    android.graphics.ImageDecoder.createSource(getResources(), resId));
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            iv.setImageDrawable(d);
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            if (d instanceof android.graphics.drawable.AnimatedImageDrawable) {
+                android.graphics.drawable.AnimatedImageDrawable ad = (android.graphics.drawable.AnimatedImageDrawable) d;
+                ad.setRepeatCount(android.graphics.drawable.AnimatedImageDrawable.REPEAT_INFINITE);
+                ad.start();
+            }
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(wDp), dp(hDp));
+            p.bottomMargin = -dp(8); // a figura "pisa" no cartão
+            parent.addView(iv, p);
+        } catch (Exception ex) {
+            Log.e(TAG, "figurinha", ex);
+        }
     }
 
     private TextView line(String s, int sp, boolean bold) {
