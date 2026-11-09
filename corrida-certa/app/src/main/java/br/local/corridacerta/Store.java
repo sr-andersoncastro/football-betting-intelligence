@@ -13,7 +13,7 @@ import java.util.List;
 final class Store extends SQLiteOpenHelper {
     static final class Row {
         long id, at;
-        String platform, dest;
+        String platform, dest, pickupAddr, pickupRegion, destRegion;
         double value, pickupKm, pickupMin, tripKm, tripMin;
         boolean accepted;
         double totalKm() { return pickupKm + tripKm; }
@@ -23,14 +23,20 @@ final class Store extends SQLiteOpenHelper {
         double perMin() { return totalMin() > 0 ? value / totalMin() : 0; }
     }
 
-    Store(Context c) { super(c.getApplicationContext(), "history.db", null, 1); }
+    Store(Context c) { super(c.getApplicationContext(), "history.db", null, 2); }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE offers(id INTEGER PRIMARY KEY, at INTEGER, platform TEXT, value REAL, pickupKm REAL, pickupMin REAL,"
-                + " tripKm REAL, tripMin REAL, dest TEXT, accepted INTEGER DEFAULT 0)");
+                + " tripKm REAL, tripMin REAL, dest TEXT, accepted INTEGER DEFAULT 0, pickupAddr TEXT, pickupRegion TEXT, destRegion TEXT)");
     }
 
-    @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {}
+    @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {
+        if (o < 2) {
+            db.execSQL("ALTER TABLE offers ADD COLUMN pickupAddr TEXT");
+            db.execSQL("ALTER TABLE offers ADD COLUMN pickupRegion TEXT");
+            db.execSQL("ALTER TABLE offers ADD COLUMN destRegion TEXT");
+        }
+    }
 
     /** Grava a oferta, ignorando repetição da mesma oferta nos últimos 10 minutos (o card é lido várias vezes). */
     /** @return id da nova linha, ou -1 se for repetição. */
@@ -45,8 +51,11 @@ final class Store extends SQLiteOpenHelper {
         v.put("pickupKm", o.pickupKm); v.put("pickupMin", o.pickupMin);
         v.put("tripKm", o.tripKm); v.put("tripMin", o.tripMin);
         v.put("dest", o.destination == null ? "" : o.destination);
+        v.put("pickupAddr", o.pickupAddress == null ? "" : o.pickupAddress);
+        v.put("pickupRegion", OfferParser.region(o.pickupAddress));
+        v.put("destRegion", OfferParser.region(o.destination));
         long id = db.insert("offers", null, v);
-        db.execSQL("DELETE FROM offers WHERE id NOT IN (SELECT id FROM offers ORDER BY at DESC LIMIT 500)");
+        db.execSQL("DELETE FROM offers WHERE id NOT IN (SELECT id FROM offers ORDER BY at DESC LIMIT 20000)");
         return id;
     }
 
@@ -55,16 +64,19 @@ final class Store extends SQLiteOpenHelper {
                 new Object[]{dest, since});
     }
 
-    List<Row> list(String platform, int limit) {
+    List<Row> list(String platform, int limit) { return list(platform, 0, limit); }
+
+    List<Row> list(String platform, long since, int limit) {
         List<Row> out = new ArrayList<>();
-        String sql = "SELECT id,at,platform,value,pickupKm,pickupMin,tripKm,tripMin,dest,accepted FROM offers"
-                + (platform == null ? "" : " WHERE platform=?") + " ORDER BY at DESC LIMIT " + limit;
+        String sql = "SELECT id,at,platform,value,pickupKm,pickupMin,tripKm,tripMin,dest,accepted,pickupAddr,pickupRegion,destRegion FROM offers"
+                + " WHERE at>=" + since + (platform == null ? "" : " AND platform=?") + " ORDER BY at DESC LIMIT " + limit;
         try (Cursor c = getReadableDatabase().rawQuery(sql, platform == null ? null : new String[]{platform})) {
             while (c.moveToNext()) {
                 Row r = new Row();
                 r.id = c.getLong(0); r.at = c.getLong(1); r.platform = c.getString(2); r.value = c.getDouble(3);
                 r.pickupKm = c.getDouble(4); r.pickupMin = c.getDouble(5); r.tripKm = c.getDouble(6); r.tripMin = c.getDouble(7);
                 r.dest = c.getString(8); r.accepted = c.getInt(9) == 1;
+                r.pickupAddr = c.getString(10); r.pickupRegion = c.getString(11); r.destRegion = c.getString(12);
                 out.add(r);
             }
         }

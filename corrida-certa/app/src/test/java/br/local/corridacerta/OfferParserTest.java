@@ -81,4 +81,22 @@ public class OfferParserTest {
         OfferParser.Offer o = OfferParser.parse("R$ 9,00\n3 min (1 km)\n10 min (4 km) Rua das Flores, 55, Centro");
         assertEquals("Rua das Flores, 55, Centro", o.destination);
     }
+
+    @Test public void bairros() {
+        assertEquals("Nonoai", OfferParser.region("Av. Fábio Araújo Santos, 1188, Nonoai, Porto Alegre"));
+        assertEquals("Floresta", OfferParser.region("Rua Garibaldi, 712, Floresta"));
+        assertEquals("Praia de Belas", OfferParser.region("Av. Aureliano de Figueiredo Pinto, 105 - Bairro, Praia de Belas, Porto Alegre"));
+        assertEquals("Praia de Belas", OfferParser.region("Rua Manoelito de Ornellas, 55/1601 - Praia de Belas"));
+        assertEquals("Bom Fim", OfferParser.region("Rua Irmão José Otão, 11 - Bom Fim, Porto Alegre - RS, 90035-060"));
+        assertNull(OfferParser.region("Avenida Francisco Trein,596"));
+        assertNull(OfferParser.region("Rua Pedro Ivo, 362"));
+        assertNull(OfferParser.region(null));
+    }
+    @Test public void embarqueEDestino() {
+        OfferParser.Offer o = OfferParser.parse("UberX\nR$ 10,36\n6 min (2.4 km)\nRua Henrique Fraeb, Partenon, Porto Alegre\n13 minutos (5.7 km)\n"
+                + "Av. Fábio Araújo Santos, 1188, Nonoai, Porto Alegre\nTenho interesse");
+        assertEquals("Rua Henrique Fraeb, Partenon, Porto Alegre", o.pickupAddress);
+        assertEquals("Partenon", OfferParser.region(o.pickupAddress));
+        assertEquals("Nonoai", OfferParser.region(o.destination));
+    }
 }

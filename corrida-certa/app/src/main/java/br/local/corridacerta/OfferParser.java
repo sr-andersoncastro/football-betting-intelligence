@@ -12,10 +12,12 @@ public final class OfferParser {
     public static final class Offer {
         public final double value, pickupKm, tripKm, pickupMin, tripMin;
         public final boolean bundle;
+        public final String pickupAddress; // endereço de embarque (pode ser null)
         public final String destination; // endereço da linha logo após o trecho da viagem (pode ser null)
 
-        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle, String destination) {
+        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle, String destination, String pickupAddress) {
             this.destination = destination;
+            this.pickupAddress = pickupAddress;
             this.value = value; this.pickupKm = pickupKm; this.pickupMin = pickupMin;
             this.tripKm = tripKm; this.tripMin = tripMin; this.bundle = bundle;
         }
@@ -42,9 +44,11 @@ public final class OfferParser {
 
         List<double[]> legs = new ArrayList<>(); // {min, km}
         Matcher l = LEG.matcher(text);
-        int tripEnd = -1;
+        int tripEnd = -1, firstEnd = -1, lastStart = -1, nLegs = 0;
         while (l.find()) {
             tripEnd = l.end();
+            if (nLegs++ == 0) firstEnd = l.end();
+            lastStart = l.start();
             double min = Double.parseDouble(l.group(2)) + (l.group(1) != null ? Double.parseDouble(l.group(1)) * 60 : 0);
             legs.add(new double[]{min, km(l.group(3), l.group(4))});
         }
@@ -58,7 +62,8 @@ public final class OfferParser {
                 || text.matches("(?s).*Aceitar\\s+[2-9]\\s+viagens.*");
         double[] trip = legs.get(legs.size() - 1);
         double[] pickup = legs.size() >= 2 ? legs.get(0) : new double[]{0, 0};
-        return new Offer(value, pickup[1], pickup[0], trip[1], trip[0], bundle, tripEnd < 0 ? null : addressAfter(text, tripEnd));
+        return new Offer(value, pickup[1], pickup[0], trip[1], trip[0], bundle, tripEnd < 0 ? null : addressAfter(text, tripEnd),
+                nLegs >= 2 ? firstAddress(text.substring(firstEnd, lastStart)) : null);
     }
 
     private static double km(String n, String unit) {
@@ -108,4 +113,30 @@ public final class OfferParser {
     }
 
     private static String clean(String a) { return a.replaceAll("[,\\s-]+$", ""); }
+
+    /** Primeiro endereço (linha que parece endereço) dentro de um trecho de texto. */
+    static String firstAddress(String segment) {
+        java.util.List<String> lines = new ArrayList<>();
+        Matcher m = Pattern.compile("[^\\r\\n]+").matcher(segment);
+        while (m.find()) lines.add(m.group().trim());
+        for (int i = 0; i < lines.size(); i++) if (!lines.get(i).isEmpty() && isAddress(lines.get(i))) return clean(joinWrapped(lines, i));
+        return null;
+    }
+
+    /** Bairro de um endereço ("Rua X, 12, Nonoai, Porto Alegre" -> "Nonoai"); null se não der para saber. */
+    public static String region(String addr) {
+        if (addr == null) return null;
+        java.util.List<String> ps = new ArrayList<>(java.util.Arrays.asList(addr.trim().split("\\s*,\\s*")));
+        while (ps.size() > 1) { // tira cidade/UF/CEP do fim
+            String last = ps.get(ps.size() - 1);
+            if (last.matches("(?i)porto alegre(\\s*-\\s*rs)?|rs|brasil|[0-9]{5}-?[0-9]{3}.*")) ps.remove(ps.size() - 1); else break;
+        }
+        String last = ps.get(ps.size() - 1);
+        int i = last.lastIndexOf(" - ");
+        if (i >= 0) last = last.substring(i + 3);
+        last = last.trim();
+        if (ps.size() < 2 && i < 0) return null;
+        if (last.isEmpty() || Character.isDigit(last.charAt(0)) || last.length() < 3) return null;
+        return last;
+    }
 }
