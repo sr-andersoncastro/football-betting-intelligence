@@ -18,4 +18,6 @@ final class Settings {
     void setLastRaw(String t) { p.edit().putString("lastRaw", t).apply(); }
     String lastResult() { return p.getString("lastResult", "Nenhuma corrida lida ainda."); }
     void setLastResult(String t) { p.edit().putString("lastResult", t).apply(); }
+    String diag() { return p.getString("diag", "Serviço ainda não foi iniciado pelo Android."); }
+    void setDiag(String t) { p.edit().putString("diag", t).apply(); }
 }

@@ -2,7 +2,6 @@
 <!-- includeNotImportantViews: sem isso o Android esconde views do card da Uber/99. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged|typeWindowsChanged"
-    android:packageNames="com.ubercab.driver,com.app99.driver"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"
     android:accessibilityFlags="flagIncludeNotImportantViews|flagRetrieveInteractiveWindows|flagReportViewIds"

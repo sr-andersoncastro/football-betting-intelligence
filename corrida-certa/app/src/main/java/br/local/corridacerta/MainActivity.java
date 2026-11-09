@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
 
     private Settings s;
     private LinearLayout statusCard;
-    private TextView statusTitle, statusSub, lastResult, lastRaw;
+    private TextView statusTitle, statusSub, lastResult, lastRaw, diagText;
     private Button activate;
 
     @Override protected void onCreate(Bundle b) {
@@ -115,6 +115,19 @@ public class MainActivity extends Activity {
         last.addView(toggle, lp(12));
         last.addView(lastRaw, lp(8));
 
+        space(root, 14);
+        LinearLayout dg = card(root);
+        dg.addView(label("Diagnóstico", 18, TEXT, true));
+        diagText = label("", 11, MUTED, false);
+        dg.addView(diagText, lp(8));
+        Button copy = button("Copiar diagnóstico", FIELD, TEXT);
+        copy.setOnClickListener(v -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("diagnostico", diagText.getText()));
+            Toast.makeText(this, "Copiado. Cole na conversa.", Toast.LENGTH_SHORT).show();
+        });
+        dg.addView(copy, lp(12));
+
         setContentView(sv);
     }
 
@@ -128,6 +141,7 @@ public class MainActivity extends Activity {
                              : "Ligue o serviço de acessibilidade para o app conseguir ler as corridas.");
         activate.setVisibility(on ? View.GONE : View.VISIBLE);
         lastResult.setText(s.lastResult());
+        diagText.setText("Serviço ligado no Android: " + (on ? "sim" : "NÃO") + "\n" + s.diag());
         String raw = s.lastRaw();
         lastRaw.setText(raw.isEmpty() ? "(nada capturado ainda)" : raw);
     }

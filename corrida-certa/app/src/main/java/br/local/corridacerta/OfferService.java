@@ -33,10 +33,31 @@ public class OfferService extends AccessibilityService {
     @Override protected void onServiceConnected() {
         settings = new Settings(this);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+        connectedAt = now();
+        diag("Serviço conectado.");
+    }
+
+    private String connectedAt = "";
+    private int events, scans;
+    private String lastEventPkg = "-", lastWindows = "-", lastUberInfo = "(nenhuma janela da Uber/99 vista)";
+    private final java.util.LinkedHashSet<String> pkgsSeen = new java.util.LinkedHashSet<>();
+
+    private static String now() { return new java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(new java.util.Date()); }
+
+    private void diag(String extra) {
+        settings.setDiag("Conectado às " + connectedAt + "\nEventos recebidos: " + events + " (último de: " + lastEventPkg + ")"
+                + "\nApps que geraram eventos: " + pkgsSeen
+                + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
+                + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent e) {
-        if (settings == null || !settings.enabled()) return;
+        if (settings == null) return;
+        events++;
+        lastEventPkg = String.valueOf(e.getPackageName());
+        if (pkgsSeen.size() < 8) pkgsSeen.add(lastEventPkg);
+        if (!settings.enabled()) return;
+        if (!lastEventPkg.equals(UBER) && !lastEventPkg.equals(APP99)) return;
         handler.removeCallbacks(scan);
         handler.postDelayed(scan, 120);
     }
@@ -47,14 +68,28 @@ public class OfferService extends AccessibilityService {
 
     private void scanWindows() {
         boolean found = false;
-        for (AccessibilityWindowInfo w : getWindows()) {
+        scans++;
+        java.util.List<AccessibilityWindowInfo> wins = getWindows();
+        StringBuilder wl = new StringBuilder();
+        wl.append(wins.size()).append(" [");
+        java.util.List<AccessibilityNodeInfo> roots = new java.util.ArrayList<>();
+        for (AccessibilityWindowInfo w : wins) {
             AccessibilityNodeInfo root = w.getRoot();
-            if (root == null) continue;
+            wl.append(root == null ? "sem-raiz" : String.valueOf(root.getPackageName())).append(' ');
+            if (root != null) roots.add(root);
+        }
+        wl.append(']');
+        lastWindows = wl.toString();
+        AccessibilityNodeInfo active = getRootInActiveWindow();
+        if (active != null) roots.add(active); // alternativa caso getWindows() não traga a janela
+        for (AccessibilityNodeInfo root : roots) {
             String pkg = String.valueOf(root.getPackageName());
             if (!pkg.equals(UBER) && !pkg.equals(APP99)) continue;
             StringBuilder sb = new StringBuilder();
             read(root, sb, 0);
             String text = sb.toString();
+            String preview = text.length() > 400 ? text.substring(0, 400) : text;
+            lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
             OfferParser.Offer o = OfferParser.parse(text);
             if (o != null) {
                 found = true;
@@ -72,6 +107,7 @@ public class OfferService extends AccessibilityService {
                 Log.d(TAG, "Sem match:\n" + text);
             }
         }
+        diag(found ? "Corrida reconhecida." : "Nenhuma corrida reconhecida neste momento.");
         if (!found) { lastShownText = ""; removeCard(); }
     }
 
