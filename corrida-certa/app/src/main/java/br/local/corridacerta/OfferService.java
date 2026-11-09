@@ -39,7 +39,7 @@ public class OfferService extends AccessibilityService {
 
     private String connectedAt = "";
     private int events, scans;
-    private String lastEventPkg = "-", lastWindows = "-", lastUberInfo = "(nenhuma janela da Uber/99 vista)";
+    private String lastEventPkg = "-", lastWindows = "-", lastUberInfo = "(nenhuma janela da Uber/99 vista)", lastOfferInfo = "(nenhum texto com R$ e km visto)";
     private final java.util.LinkedHashSet<String> pkgsSeen = new java.util.LinkedHashSet<>();
 
     private static String now() { return new java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(new java.util.Date()); }
@@ -48,6 +48,7 @@ public class OfferService extends AccessibilityService {
         settings.setDiag("Conectado às " + connectedAt + "\nEventos recebidos: " + events + " (último de: " + lastEventPkg + ")"
                 + "\nApps que geraram eventos: " + pkgsSeen
                 + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
+                + "\nÚltimo texto com R$ e km: " + lastOfferInfo
                 + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
 
@@ -58,15 +59,22 @@ public class OfferService extends AccessibilityService {
         if (pkgsSeen.size() < 8) pkgsSeen.add(lastEventPkg);
         if (!settings.enabled()) return;
         if (!lastEventPkg.equals(UBER) && !lastEventPkg.equals(APP99)) return;
-        handler.removeCallbacks(scan);
-        handler.postDelayed(scan, 120);
+        // Throttle (não debounce): a Uber manda eventos sem parar com o mapa/contagem na tela,
+        // então esperar uma pausa nunca dispararia a leitura.
+        if (!scanPending) {
+            scanPending = true;
+            handler.postDelayed(scan, 150);
+        }
     }
+
+    private boolean scanPending;
 
     @Override public void onInterrupt() { handler.removeCallbacks(scan); }
 
     @Override public void onDestroy() { handler.removeCallbacksAndMessages(null); removeCard(); super.onDestroy(); }
 
     private void scanWindows() {
+        scanPending = false;
         boolean found = false;
         scans++;
         java.util.List<AccessibilityWindowInfo> wins = getWindows();
@@ -89,6 +97,9 @@ public class OfferService extends AccessibilityService {
             read(root, sb, 0);
             String text = sb.toString();
             String preview = text.length() > 400 ? text.substring(0, 400) : text;
+            if (text.contains("R$") && text.contains("km")) {
+                lastOfferInfo = pkg + " às " + now() + ", " + text.length() + " caracteres:\n" + (text.length() > 700 ? text.substring(0, 700) : text);
+            }
             lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
             OfferParser.Offer o = OfferParser.parse(text);
             if (o != null) {
@@ -112,7 +123,7 @@ public class OfferService extends AccessibilityService {
     }
 
     private void read(AccessibilityNodeInfo n, StringBuilder sb, int depth) {
-        if (n == null || depth > 40 || sb.length() > 20000) return;
+        if (n == null || depth > 60 || sb.length() > 80000) return;
         CharSequence t = n.getText();
         if (t != null && t.length() > 0) sb.append(t).append('\n');
         CharSequence d = n.getContentDescription();
