@@ -42,7 +42,7 @@ public class OfferService extends AccessibilityService {
 
     private String connectedAt = "";
     private int events, scans;
-    private String lastEventPkg = "-", lastWindows = "-", lastUberInfo = "(nenhuma janela da Uber/99 vista)", lastOfferInfo = "(nenhum texto com R$ e km visto)";
+    private String lastEventPkg = "-", lastWindows = "-", lastUberInfo = "(nenhuma janela da Uber/99 vista)", lastOfferInfo = "(nenhum texto no formato 'N min (X km)' visto ainda)";
     private final java.util.LinkedHashSet<String> pkgsSeen = new java.util.LinkedHashSet<>();
 
     private static String now() { return new java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(new java.util.Date()); }
@@ -51,7 +51,7 @@ public class OfferService extends AccessibilityService {
         settings.setDiag("Conectado às " + connectedAt + "\nEventos recebidos: " + events + " (último de: " + lastEventPkg + ")"
                 + "\nApps que geraram eventos: " + pkgsSeen
                 + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
-                + "\nÚltimo texto com R$ e km: " + lastOfferInfo
+                + "\nÚltimo card de corrida visto: " + lastOfferInfo
                 + "\nOCR: " + ocrInfo
                 + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
@@ -102,7 +102,7 @@ public class OfferService extends AccessibilityService {
             read(root, sb, 0);
             String text = sb.toString();
             String preview = text.length() > 400 ? text.substring(0, 400) : text;
-            if (text.contains("R$") && text.contains("km")) {
+            if (looksLikeOffer(text)) {
                 lastOfferInfo = pkg + " às " + now() + ", " + text.length() + " caracteres:\n" + (text.length() > 700 ? text.substring(0, 700) : text);
             }
             lastUberInfo = pkg + " às " + now() + ", " + text.length() + " caracteres lidos:\n" + preview;
@@ -133,6 +133,10 @@ public class OfferService extends AccessibilityService {
     }
 
     // ---- Leitura por print + OCR (para apps que escondem o texto da acessibilidade, como a 99) ----
+    private static boolean looksLikeOffer(String s) {
+        return s.matches("(?is).*min\\w*\\s*[(\\[]\\s*[0-9][0-9.,]*\\s*(km|m)\\s*[)\\]].*");
+    }
+
     private long lastTreeHit;
     private boolean ocrBusy;
     private long lastOcr;
@@ -184,7 +188,7 @@ public class OfferService extends AccessibilityService {
 
     private void onOcrText(String text) {
         ocrInfo = now() + ", " + text.length() + " caracteres:\n" + (text.length() > 500 ? text.substring(0, 500) : text);
-        if (text.contains("R$") && text.contains("km")) lastOfferInfo = "OCR " + ocrInfo;
+        if (looksLikeOffer(text)) lastOfferInfo = "OCR " + ocrInfo;
         OfferParser.Offer o = OfferParser.parse(text);
         if (o != null) {
             String key = String.format(Locale.US, "%.2f|%.1f|%.1f", o.value, o.pickupKm, o.tripKm);
