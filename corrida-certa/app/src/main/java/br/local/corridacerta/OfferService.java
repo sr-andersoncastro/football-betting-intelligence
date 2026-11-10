@@ -2,6 +2,7 @@ package br.local.corridacerta;
 
 import android.accessibilityservice.AccessibilityService;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
@@ -11,6 +12,7 @@ import android.graphics.Bitmap;
 import android.hardware.HardwareBuffer;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -295,41 +297,164 @@ public class OfferService extends AccessibilityService {
     private void showCard(OfferParser.Offer o) {
         removeCard();
         int cat = settings.category(o.perKm()); // 0 ruim, 1 média, 2 boa (pelo R$/km)
-        int color = cat == 2 ? Color.rgb(27, 143, 76) : (cat == 0 ? Color.rgb(198, 40, 40) : Color.rgb(230, 140, 0));
+        int top = cat == 2 ? Color.parseColor("#34D27B") : (cat == 1 ? Color.parseColor("#FBBF24") : Color.parseColor("#F87171"));
+        int bottom = cat == 2 ? Color.parseColor("#0E8A4A") : (cat == 1 ? Color.parseColor("#D97706") : Color.parseColor("#B91C1C"));
+        Locale br = new Locale("pt", "BR");
+        float rad = dp(22);
 
+        // ---- cartão com degradê, brilho no topo, borda clara e sombra (efeito 3D) ----
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(10), dp(16), dp(10));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(color);
-        bg.setCornerRadius(dp(14));
-        box.setBackground(bg);
+        box.setPadding(dp(16), dp(12), dp(16), dp(14));
+        GradientDrawable base = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bottom});
+        base.setCornerRadius(rad);
+        base.setStroke(dp(2), Color.argb(150, 255, 255, 255));
+        GradientDrawable gloss = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.argb(95, 255, 255, 255), Color.argb(0, 255, 255, 255)});
+        gloss.setCornerRadii(new float[]{rad, rad, rad, rad, 0, 0, 0, 0});
+        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{base, gloss});
+        layers.setLayerInset(1, dp(3), dp(3), dp(3), dp(78));
+        box.setBackground(layers);
+        box.setElevation(dp(14));
+        box.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override public void getOutline(View v, android.graphics.Outline out) {
+                out.setRoundRect(0, 0, v.getWidth(), v.getHeight(), rad);
+            }
+        });
 
-        TextView l1 = line(String.format(Locale.US, "R$ %.2f/km   R$ %.2f/h", o.perKm(), o.perHour()), 20, true);
-        TextView l2 = line(String.format(Locale.US, "%.1f km · %.0f min%s", o.totalKm(), o.totalMin(), o.bundle ? " · pacote" : ""), 13, false);
-        TextView l0 = line(cat == 2 ? "Corrida boa" : (cat == 0 ? "Corrida ruim" : "Corrida média"), 14, true);
-        box.addView(l0);
-        box.addView(l1);
-        box.addView(l2);
+        // etiqueta da categoria
+        TextView pill = new TextView(this);
+        pill.setText(cat == 2 ? "CORRIDA BOA" : (cat == 0 ? "CORRIDA RUIM" : "CORRIDA MÉDIA"));
+        pill.setTextColor(Color.WHITE);
+        pill.setTextSize(11);
+        pill.setLetterSpacing(0.08f);
+        pill.setTypeface(pill.getTypeface(), Typeface.BOLD);
+        pill.setPadding(dp(10), dp(3), dp(10), dp(3));
+        GradientDrawable pbg = new GradientDrawable();
+        pbg.setColor(Color.argb(70, 0, 0, 0));
+        pbg.setCornerRadius(dp(10));
+        pill.setBackground(pbg);
+        box.addView(pill, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // contêiner transparente: figurinha animada em cima do cartão (só quando a corrida é boa)
+        // números principais: R$/km e R$/h
+        LinearLayout nums = new LinearLayout(this);
+        nums.setOrientation(LinearLayout.HORIZONTAL);
+        nums.setGravity(Gravity.CENTER_VERTICAL);
+        nums.addView(bigNumber(String.format(br, "%.2f", o.perKm()), "/km", 32, Gravity.START),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        View div = new View(this);
+        div.setBackgroundColor(Color.argb(110, 255, 255, 255));
+        nums.addView(div, new LinearLayout.LayoutParams(dp(1), dp(34)));
+        nums.addView(bigNumber(String.format(br, "%.2f", o.perHour()), "/h", 26, Gravity.END),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        nlp.topMargin = dp(6);
+        box.addView(nums, nlp);
+
+        // medidor ruim / média / boa com marcador
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22));
+        glp.topMargin = dp(8);
+        box.addView(new Gauge(this, o.perKm(), settings.badBelowKm(), settings.goodFromKm()), glp);
+
+        // detalhes
+        TextView info = new TextView(this);
+        info.setText(String.format(br, "%.1f km  ·  %.0f min  ·  R$ %.2f%s", o.totalKm(), o.totalMin(), o.value, o.bundle ? "  ·  pacote" : ""));
+        info.setTextColor(Color.argb(235, 255, 255, 255));
+        info.setTextSize(13);
+        info.setGravity(Gravity.CENTER);
+        info.setShadowLayer(dp(2), 0, dp(1), Color.argb(90, 0, 0, 0));
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ilp.topMargin = dp(6);
+        box.addView(info, ilp);
+
+        // ---- composição: figurinha em cima, "pisando" no cartão ----
         card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
-        if (cat == 2) addSticker(card, R.raw.sticker_boa, 190, 105);
-        else if (cat == 0) addSticker(card, R.raw.sticker_ruim, 190, 107);
-        else addSticker(card, R.raw.sticker_media, 190, 107); // média: "tanto faz"
-        card.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        card.setClipChildren(false);
+        card.setClipToPadding(false);
+        card.setPadding(dp(14), dp(6), dp(14), dp(18)); // espaço para a sombra
+        if (cat == 2) addSticker(card, R.raw.sticker_boa, 250, 140);
+        else if (cat == 0) addSticker(card, R.raw.sticker_ruim, 250, 140);
+        else addSticker(card, R.raw.sticker_media, 250, 140);
+        card.addView(box, new LinearLayout.LayoutParams(dp(300), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, // não exige permissão de sobreposição
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.y = dp(80);
-        try { wm.addView(card, lp); } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
+        lp.y = dp(40);
+        try {
+            wm.addView(card, lp);
+            // entrada com "pulo"
+            card.setScaleX(0.75f);
+            card.setScaleY(0.75f);
+            card.setAlpha(0f);
+            card.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(280)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
+        } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
+    }
+
+    /** "R$ 3,35/km": número grande, "R$" e unidade menores. */
+    private TextView bigNumber(String number, String unit, int sp, int gravity) {
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        sb.append("R$ ");
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.5f), 0, 3, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int s = sb.length();
+        sb.append(number);
+        sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), s, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int u = sb.length();
+        sb.append(unit);
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.5f), u, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        TextView v = new TextView(this);
+        v.setText(sb);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(sp);
+        v.setGravity(gravity | Gravity.CENTER_VERTICAL);
+        v.setShadowLayer(dp(3), 0, dp(1), Color.argb(110, 0, 0, 0));
+        return v;
+    }
+
+    /** Medidor horizontal: vermelho (ruim) / laranja (média) / verde (boa), com um marcador onde esta corrida está. */
+    private class Gauge extends View {
+        private final double v, bad, good;
+        private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        Gauge(android.content.Context c, double perKm, double bad, double good) {
+            super(c);
+            this.v = perKm; this.bad = bad; this.good = good;
+        }
+
+        @Override protected void onDraw(android.graphics.Canvas c) {
+            float w = getWidth(), h = getHeight();
+            float barH = dp(8), cy = h / 2f, r = barH / 2f;
+            double max = good * 1.5;
+            float xb = (float) Math.min(1, bad / max) * w, xg = (float) Math.min(1, good / max) * w;
+            // trilho escuro
+            p.setColor(Color.argb(80, 0, 0, 0));
+            c.drawRoundRect(0, cy - barH / 2 - dp(2), w, cy + barH / 2 + dp(2), r + dp(2), r + dp(2), p);
+            android.graphics.Path clip = new android.graphics.Path();
+            clip.addRoundRect(dp(2), cy - barH / 2, w - dp(2), cy + barH / 2, r, r, android.graphics.Path.Direction.CW);
+            c.save();
+            c.clipPath(clip);
+            p.setColor(Color.parseColor("#EF4444")); c.drawRect(0, 0, xb, h, p);
+            p.setColor(Color.parseColor("#F59E0B")); c.drawRect(xb, 0, xg, h, p);
+            p.setColor(Color.parseColor("#22C55E")); c.drawRect(xg, 0, w, h, p);
+            c.restore();
+            // marcador
+            float mx = (float) Math.max(0, Math.min(1, v / max)) * w;
+            mx = Math.max(dp(8), Math.min(w - dp(8), mx));
+            p.setColor(Color.argb(90, 0, 0, 0));
+            c.drawCircle(mx, cy + dp(1), dp(8), p);
+            p.setColor(Color.WHITE);
+            c.drawCircle(mx, cy, dp(7), p);
+            p.setColor(v >= good ? Color.parseColor("#22C55E") : (v >= bad ? Color.parseColor("#F59E0B") : Color.parseColor("#EF4444")));
+            c.drawCircle(mx, cy, dp(4), p);
+        }
     }
 
     /** Figurinha (GIF animado) acima do cartão. Se não conseguir animar, não mostra nada (o cartão continua normal). */
@@ -346,7 +471,7 @@ public class OfferService extends AccessibilityService {
                 ad.start();
             }
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(wDp), dp(hDp));
-            p.bottomMargin = -dp(8); // a figura "pisa" no cartão
+            p.bottomMargin = -dp(34); // a figura "pisa" no cartão
             parent.addView(iv, p);
         } catch (Exception ex) {
             Log.e(TAG, "figurinha", ex);
