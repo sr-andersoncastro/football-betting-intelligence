@@ -99,4 +99,12 @@ public class OfferParserTest {
         assertEquals("Partenon", OfferParser.region(o.pickupAddress));
         assertEquals("Nonoai", OfferParser.region(o.destination));
     }
+
+    @Test public void notaDoPassageiro() {
+        OfferParser.Offer u = OfferParser.parse("UberX\nR$ 10,36\nEst. de R$1,28/km\n4,95\nVerificado\n6 min (2.4 km)\nRua A, 10, Centro\n13 minutos (5.7 km)\nRua B, 20, Nonoai");
+        assertEquals("4,95", u.rating);
+        OfferParser.Offer n = OfferParser.parse("R$12,48\nR$1,38 por embarque distante incl.\n5,00 · 14 corridas\n6 min (1,9 km)\nRua 16 Unidos, 244, Maria Regina\n15 min (7,1 km)\nRua Cento e Quarenta e Seis, 27, Jardim Algarve");
+        assertEquals("5,00", n.rating);
+        assertNull(OfferParser.parse("R$ 9,00\n3 min (1 km)\n10 min (4 km)\nRua X, 5, Centro").rating);
+    }
 }

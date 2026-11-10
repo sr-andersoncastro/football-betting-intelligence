@@ -125,7 +125,7 @@ public class OfferService extends AccessibilityService {
                     settings.setLastRaw(text);
                     settings.setLastResult(String.format(Locale.US, "%s: R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
                             pkg.equals(UBER) ? "Uber" : "99", o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
-                    showCard(o);
+                    showCard(o, geometryFromTree(root), pkg.equals(UBER) ? "Uber" : "99");
                 }
                 handler.removeCallbacks(hide);
                 handler.postDelayed(hide, 20000);
@@ -240,7 +240,16 @@ public class OfferService extends AccessibilityService {
                     }
                     final Bitmap img = bmp;
                     recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(img, 0))
-                            .addOnSuccessListener(res -> { ocrBusy = false; onOcrText(res.getText(), img); img.recycle(); })
+                            .addOnSuccessListener(res -> {
+                                ocrBusy = false;
+                                java.util.List<Object[]> ls = new java.util.ArrayList<>();
+                                for (com.google.mlkit.vision.text.Text.TextBlock b : res.getTextBlocks())
+                                    for (com.google.mlkit.vision.text.Text.Line ln : b.getLines())
+                                        if (ln.getBoundingBox() != null) ls.add(new Object[]{ln.getText(), ln.getBoundingBox()});
+                                ocrLines = ls;
+                                onOcrText(res.getText(), img);
+                                img.recycle();
+                            })
                             .addOnFailureListener(ex -> { ocrBusy = false; img.recycle(); ocrInfo = "OCR falhou: " + ex; diag(""); });
                 }
                 @Override public void onFailure(int code) {
@@ -260,6 +269,9 @@ public class OfferService extends AccessibilityService {
         ocrInfo = now() + ", " + text.length() + " caracteres:\n" + (text.length() > 500 ? text.substring(0, 500) : text);
         if (looksLikeOffer(text)) lastOfferInfo = "OCR " + ocrInfo;
         OfferParser.Offer o = OfferParser.parse(text);
+        // o botão de aceitar do card real aparece pelo "buraco" do nosso card: se ele está na tela, a oferta continua viva
+        boolean alive = false;
+        for (Object[] ln : ocrLines) if (ACCEPT_RE.matcher((String) ln[0]).matches()) { alive = true; break; }
         if (o != null) {
             String key = String.format(Locale.US, "%.2f|%.1f|%.1f", o.value, o.pickupKm, o.tripKm);
             if (!key.equals(lastShownText)) {
@@ -267,17 +279,20 @@ public class OfferService extends AccessibilityService {
                 settings.setLastRaw(text);
                 settings.setLastResult(String.format(Locale.US, "Uber/99 (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
                         o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
-                showCard(o);
+                showCard(o, geometryFromOcr(), ocrPkg.equals(UBER) ? "Uber" : "99");
             }
             rememberOffer(o, ocrPkg.equals(UBER) ? "Uber" : "99", shot);
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
+        } else if (alive && !lastShownText.isEmpty()) {
+            handler.removeCallbacks(hide);
+            handler.postDelayed(hide, 20000);
         } else {
             checkAccepted(text);
-        }
-        if (o == null && System.currentTimeMillis() - lastTreeHit > 2500) {
-            lastShownText = "";
-            removeCard();
+            if (System.currentTimeMillis() - lastTreeHit > 2500) {
+                lastShownText = "";
+                removeCard();
+            }
         }
         diag(o != null ? "Corrida reconhecida (OCR)." : "OCR sem corrida.");
     }
@@ -294,108 +309,269 @@ public class OfferService extends AccessibilityService {
         }
     }
 
-    private void showCard(OfferParser.Offer o) {
+    // ===== card do tamanho exato do card da Uber/99, por cima dele, com "buracos" nos botões originais =====
+    private static final java.util.regex.Pattern ACCEPT_RE = java.util.regex.Pattern.compile(
+            "(?is)^\\s*(tenho interesse|aceitar.*|tentando encontrar.*|procurando.*|confirmar.*)\\s*$");
+    private static final java.util.regex.Pattern PRICE_RE = java.util.regex.Pattern.compile(
+            "(?s)^\\s*R\\$\\s*[0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{2}\\s*$");
+    private java.util.List<Object[]> ocrLines = new java.util.ArrayList<>();
+
+    /** Posição do card real na tela e dos botões que devem ficar visíveis (buracos). */
+    private static final class CardGeometry {
+        android.graphics.Rect rect;
+        android.graphics.Rect accept;  // botão de aceitar (null se desconhecido)
+        android.graphics.Rect close;   // X de recusar dentro do card (null se não houver)
+    }
+
+    private AccessibilityNodeInfo findNode(AccessibilityNodeInfo n, java.util.regex.Pattern re, int depth) {
+        if (n == null || depth > 60) return null;
+        CharSequence tx = n.getText(), d = n.getContentDescription();
+        if ((tx != null && re.matcher(tx).matches()) || (d != null && re.matcher(d).matches())) return n;
+        for (int i = 0; i < n.getChildCount(); i++) {
+            AccessibilityNodeInfo r = findNode(n.getChild(i), re, depth + 1);
+            if (r != null) return r;
+        }
+        return null;
+    }
+
+    private void collectClickRects(AccessibilityNodeInfo n, android.graphics.Rect within, java.util.List<android.graphics.Rect> out, int depth) {
+        if (n == null || depth > 60) return;
+        if (n.isClickable()) {
+            android.graphics.Rect r = new android.graphics.Rect();
+            n.getBoundsInScreen(r);
+            if (android.graphics.Rect.intersects(r, within)) out.add(r);
+        }
+        for (int i = 0; i < n.getChildCount(); i++) collectClickRects(n.getChild(i), within, out, depth + 1);
+    }
+
+    /** Uber: acha o card pelo botão "Tenho interesse" e pelo preço (a acessibilidade informa as posições). */
+    private CardGeometry geometryFromTree(AccessibilityNodeInfo root) {
+        try {
+            AccessibilityNodeInfo accept = findNode(root, ACCEPT_RE, 0);
+            AccessibilityNodeInfo price = findNode(root, PRICE_RE, 0);
+            if (accept == null || price == null) return null;
+            int sw = getResources().getDisplayMetrics().widthPixels, sh = getResources().getDisplayMetrics().heightPixels;
+            android.graphics.Rect ar = new android.graphics.Rect(), pr = new android.graphics.Rect();
+            AccessibilityNodeInfo btn = accept;
+            while (btn != null && !btn.isClickable()) btn = btn.getParent();
+            (btn != null ? btn : accept).getBoundsInScreen(ar);
+            price.getBoundsInScreen(pr);
+            android.graphics.Rect card = null;
+            AccessibilityNodeInfo p = accept.getParent();
+            while (p != null) {
+                android.graphics.Rect r = new android.graphics.Rect();
+                p.getBoundsInScreen(r);
+                if (r.contains(pr) && r.contains(ar) && r.width() >= sw * 0.8) {
+                    if (r.height() < sh * 0.75) card = r;
+                    break;
+                }
+                p = p.getParent();
+            }
+            if (card == null) card = new android.graphics.Rect(ar.left - dp(10), pr.top - dp(48), ar.right + dp(10), ar.bottom + dp(14));
+            CardGeometry g = new CardGeometry();
+            g.rect = card;
+            g.accept = ar;
+            java.util.List<android.graphics.Rect> clicks = new java.util.ArrayList<>();
+            collectClickRects(root, card, clicks, 0);
+            for (android.graphics.Rect r : clicks) { // o X: clicável pequeno no canto de cima à direita do card
+                if (r.centerX() > card.left + card.width() * 0.7 && r.centerY() < card.top + card.height() * 0.35 && r.width() < card.width() * 0.3) { g.close = r; break; }
+            }
+            return g;
+        } catch (Exception ex) { Log.e(TAG, "geometria", ex); return null; }
+    }
+
+    /** 99: o texto não vem pela acessibilidade; usa as posições do texto lido no print. */
+    private CardGeometry geometryFromOcr() {
+        try {
+            android.graphics.Rect pr = null, ar = null;
+            for (Object[] ln : ocrLines) {
+                String s = (String) ln[0];
+                android.graphics.Rect r = (android.graphics.Rect) ln[1];
+                if (pr == null && PRICE_RE.matcher(s).matches()) pr = r;
+                if (ar == null && ACCEPT_RE.matcher(s).matches()) ar = r;
+            }
+            if (pr == null || ar == null) return null;
+            int sw = getResources().getDisplayMetrics().widthPixels;
+            int minTop = pr.top;
+            for (Object[] ln : ocrLines) {
+                android.graphics.Rect r = (android.graphics.Rect) ln[1];
+                if (r.top >= pr.top - dp(60) && r.bottom <= ar.bottom) minTop = Math.min(minTop, r.top);
+            }
+            int side = Math.round(sw * 0.018f);
+            CardGeometry g = new CardGeometry();
+            g.rect = new android.graphics.Rect(side, minTop - dp(18), sw - side, ar.centerY() + dp(22) + dp(13));
+            g.accept = new android.graphics.Rect(g.rect.left + dp(10), ar.centerY() - dp(22), g.rect.right - dp(10), ar.centerY() + dp(22));
+            return g;
+        } catch (Exception ex) { Log.e(TAG, "geometria", ex); return null; }
+    }
+
+    /** Fundo do card: degradê, brilho, borda e furos transparentes nos botões originais. */
+    private class CardBg extends View {
+        private final int top, bottom;
+        private final java.util.List<android.graphics.RectF> holes;
+        private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint clear = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        CardBg(android.content.Context c, int top, int bottom, java.util.List<android.graphics.RectF> holes) {
+            super(c);
+            this.top = top; this.bottom = bottom; this.holes = holes;
+            clear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+            setLayerType(LAYER_TYPE_HARDWARE, null);
+        }
+
+        @Override protected void onDraw(android.graphics.Canvas c) {
+            float w = getWidth(), h = getHeight(), r = dp(22);
+            int sc = c.saveLayer(0, 0, w, h, null);
+            p.setStyle(android.graphics.Paint.Style.FILL);
+            p.setShader(new android.graphics.LinearGradient(0, 0, 0, h, top, bottom, android.graphics.Shader.TileMode.CLAMP));
+            c.drawRoundRect(0, 0, w, h, r, r, p);
+            p.setShader(new android.graphics.LinearGradient(0, 0, 0, h * 0.45f, Color.argb(95, 255, 255, 255), Color.argb(0, 255, 255, 255), android.graphics.Shader.TileMode.CLAMP));
+            c.drawRoundRect(dp(3), dp(3), w - dp(3), h * 0.45f, r, r, p);
+            p.setShader(null);
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(dp(2));
+            p.setColor(Color.argb(150, 255, 255, 255));
+            c.drawRoundRect(dp(1), dp(1), w - dp(1), h - dp(1), r, r, p);
+            for (android.graphics.RectF hole : holes) c.drawRoundRect(hole, dp(14), dp(14), clear);
+            p.setColor(Color.argb(190, 255, 255, 255));
+            for (android.graphics.RectF hole : holes) c.drawRoundRect(hole, dp(14), dp(14), p);
+            c.restoreToCount(sc);
+        }
+    }
+
+    private TextView txt(String s, int sp, int color, boolean bold) {
+        TextView v = new TextView(this);
+        v.setText(s);
+        v.setTextSize(sp);
+        v.setTextColor(color);
+        if (bold) v.setTypeface(v.getTypeface(), Typeface.BOLD);
+        v.setShadowLayer(dp(2), 0, dp(1), Color.argb(100, 0, 0, 0));
+        return v;
+    }
+
+    private TextView addressBlock(String label, double min, double km, String addr, Locale br) {
+        TextView v = new TextView(this);
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        sb.append(label).append(String.format(br, "  ·  %.0f min  ·  %.1f km\n", min, km));
+        sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.82f), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new android.text.style.ForegroundColorSpan(Color.argb(220, 255, 255, 255)), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.append(addr == null || addr.isEmpty() ? "(endereço não lido)" : addr);
+        v.setText(sb);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(14);
+        v.setMaxLines(3);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        v.setShadowLayer(dp(2), 0, dp(1), Color.argb(100, 0, 0, 0));
+        return v;
+    }
+
+    private void showCard(OfferParser.Offer o, CardGeometry geo, String platform) {
         removeCard();
         int cat = settings.category(o.perKm()); // 0 ruim, 1 média, 2 boa (pelo R$/km)
         int top = cat == 2 ? Color.parseColor("#34D27B") : (cat == 1 ? Color.parseColor("#FBBF24") : Color.parseColor("#F87171"));
         int bottom = cat == 2 ? Color.parseColor("#0E8A4A") : (cat == 1 ? Color.parseColor("#D97706") : Color.parseColor("#B91C1C"));
         Locale br = new Locale("pt", "BR");
-        float rad = dp(22);
+        int sw = getResources().getDisplayMetrics().widthPixels;
 
-        // ---- cartão com degradê, brilho no topo, borda clara e sombra (efeito 3D) ----
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(12), dp(16), dp(14));
-        GradientDrawable base = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bottom});
-        base.setCornerRadius(rad);
-        base.setStroke(dp(2), Color.argb(150, 255, 255, 255));
-        GradientDrawable gloss = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.argb(95, 255, 255, 255), Color.argb(0, 255, 255, 255)});
-        gloss.setCornerRadii(new float[]{rad, rad, rad, rad, 0, 0, 0, 0});
-        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
-                new android.graphics.drawable.Drawable[]{base, gloss});
-        layers.setLayerInset(1, dp(3), dp(3), dp(3), dp(92));
-        box.setBackground(layers);
-        box.setElevation(dp(14));
-        box.setOutlineProvider(new android.view.ViewOutlineProvider() {
-            @Override public void getOutline(View v, android.graphics.Outline out) {
-                out.setRoundRect(0, 0, v.getWidth(), v.getHeight(), rad);
-            }
-        });
+        // retângulo do card real (ou, se não achou, um card padrão no alto da tela, sem buracos)
+        android.graphics.Rect rect;
+        android.graphics.Rect accept = null, close = null;
+        if (geo != null && geo.rect != null) { rect = new android.graphics.Rect(geo.rect); accept = geo.accept; close = geo.close; }
+        else { int w = Math.min(sw - dp(24), dp(360)); int l = (sw - w) / 2; rect = new android.graphics.Rect(l, dp(110), l + w, dp(110) + dp(250)); }
+        int W = rect.width();
 
-        // etiqueta da categoria
-        TextView pill = new TextView(this);
-        pill.setText(cat == 2 ? "CORRIDA BOA" : (cat == 0 ? "CORRIDA RUIM" : "CORRIDA MÉDIA"));
-        pill.setTextColor(Color.WHITE);
-        pill.setTextSize(12);
+        // conteúdo: reserva o espaço do botão de aceitar (embaixo) e do X (em cima, à direita)
+        int bottomReserve = (accept != null) ? Math.max(dp(10), rect.bottom - accept.top + dp(6)) : dp(12);
+        int topRightReserve = (close != null) ? Math.max(0, rect.right - close.left + dp(6)) : 0;
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(10), dp(16), bottomReserve);
+
+        // linha 1: categoria, plataforma e nota do passageiro
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, 0, topRightReserve, 0);
+        TextView pill = txt((cat == 2 ? "BOA" : (cat == 0 ? "RUIM" : "MÉDIA")) + " · " + platform.toUpperCase(Locale.ROOT), 12, Color.WHITE, true);
         pill.setLetterSpacing(0.08f);
-        pill.setTypeface(pill.getTypeface(), Typeface.BOLD);
         pill.setPadding(dp(10), dp(3), dp(10), dp(3));
         GradientDrawable pbg = new GradientDrawable();
-        pbg.setColor(Color.argb(70, 0, 0, 0));
+        pbg.setColor(Color.argb(80, 0, 0, 0));
         pbg.setCornerRadius(dp(10));
         pill.setBackground(pbg);
-        box.addView(pill, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        head.addView(pill);
+        if (o.rating != null) {
+            TextView star = txt("★ " + o.rating, 14, Color.WHITE, true);
+            star.setPadding(dp(12), 0, 0, 0);
+            head.addView(star);
+        }
+        content.addView(head);
 
-        // números principais: R$/km e R$/h
-        LinearLayout nums = new LinearLayout(this);
-        nums.setOrientation(LinearLayout.HORIZONTAL);
-        nums.setGravity(Gravity.CENTER_VERTICAL);
-        nums.addView(bigNumber(String.format(br, "%.2f", o.perKm()), "/km", 42, Gravity.START),
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        View div = new View(this);
-        div.setBackgroundColor(Color.argb(110, 255, 255, 255));
-        nums.addView(div, new LinearLayout.LayoutParams(dp(1), dp(44)));
-        nums.addView(bigNumber(String.format(br, "%.2f", o.perHour()), "/h", 34, Gravity.END),
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        nlp.topMargin = dp(6);
-        box.addView(nums, nlp);
+        // linha 2: valor grande + R$/km e R$/h
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView value = bigNumber(String.format(br, "%.2f", o.value), "", 46, Gravity.START);
+        row.addView(value, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        LinearLayout rates = new LinearLayout(this);
+        rates.setOrientation(LinearLayout.VERTICAL);
+        rates.addView(bigNumber(String.format(br, "%.2f", o.perKm()), "/km", 26, Gravity.END));
+        rates.addView(bigNumber(String.format(br, "%.2f", o.perHour()), "/h", 26, Gravity.END));
+        row.addView(rates, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        content.addView(row);
 
-        // medidor ruim / média / boa com marcador
-        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22));
-        glp.topMargin = dp(8);
-        box.addView(new Gauge(this, o.perKm(), settings.badBelowKm(), settings.goodFromKm()), glp);
+        // medidor ruim / média / boa
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(20));
+        glp.topMargin = dp(2);
+        content.addView(new Gauge(this, o.perKm(), settings.badBelowKm(), settings.goodFromKm()), glp);
 
-        // detalhes
-        TextView info = new TextView(this);
-        info.setText(String.format(br, "%.1f km  ·  %.0f min  ·  R$ %.2f%s", o.totalKm(), o.totalMin(), o.value, o.bundle ? "  ·  pacote" : ""));
-        info.setTextColor(Color.argb(235, 255, 255, 255));
-        info.setTextSize(15);
-        info.setGravity(Gravity.CENTER);
-        info.setShadowLayer(dp(2), 0, dp(1), Color.argb(90, 0, 0, 0));
-        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ilp.topMargin = dp(6);
-        box.addView(info, ilp);
+        // embarque e destino
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.topMargin = dp(8);
+        content.addView(addressBlock("EMBARQUE", o.pickupMin, o.pickupKm, o.pickupAddress, br), alp);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dlp.topMargin = dp(6);
+        content.addView(addressBlock("DESTINO", o.tripMin, o.tripKm, o.destination, br), dlp);
 
-        // ---- composição: figurinha em cima, "pisando" no cartão ----
+        // altura: a do card real; se o conteúdo precisar de mais, cresce para cima (a base fica alinhada)
+        content.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int H = Math.max(rect.height(), content.getMeasuredHeight());
+        int cardTop = rect.bottom - H;
+
+        java.util.List<android.graphics.RectF> holes = new java.util.ArrayList<>();
+        if (accept != null) holes.add(new android.graphics.RectF(accept.left - rect.left - dp(2), accept.top - cardTop - dp(2), accept.right - rect.left + dp(2), accept.bottom - cardTop + dp(2)));
+        if (close != null) holes.add(new android.graphics.RectF(close.left - rect.left - dp(2), close.top - cardTop - dp(2), close.right - rect.left + dp(2), close.bottom - cardTop + dp(2)));
+
+        android.widget.FrameLayout box = new android.widget.FrameLayout(this);
+        box.addView(new CardBg(this, top, bottom, holes), new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        box.addView(content, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // composição: figurinha pequena "espiando" acima do canto do card
         card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setClipChildren(false);
         card.setClipToPadding(false);
-        card.setPadding(dp(14), dp(6), dp(14), dp(18)); // espaço para a sombra
-        if (cat == 2) addSticker(card, R.raw.sticker_boa, 250, 140);
-        else if (cat == 0) addSticker(card, R.raw.sticker_ruim, 250, 140);
-        else addSticker(card, R.raw.sticker_media, 250, 140);
-        card.addView(box, new LinearLayout.LayoutParams(dp(340), ViewGroup.LayoutParams.WRAP_CONTENT));
+        int stickerH = dp(84), overlap = dp(22);
+        addSticker(card, cat == 2 ? R.raw.sticker_boa : (cat == 0 ? R.raw.sticker_ruim : R.raw.sticker_media), 150, 84, 22, 14);
+        card.addView(box, new LinearLayout.LayoutParams(W, H));
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                W, ViewGroup.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, // não exige permissão de sobreposição
+                // NOT_TOUCHABLE: os toques passam para o card real embaixo, então os botões originais seguem funcionando
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.y = dp(40);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.x = rect.left;
+        lp.y = Math.max(0, cardTop - (stickerH - overlap));
         try {
             wm.addView(card, lp);
-            // entrada com "pulo"
-            card.setScaleX(0.75f);
-            card.setScaleY(0.75f);
             card.setAlpha(0f);
-            card.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(280)
-                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
+            card.animate().alpha(1f).setDuration(160).start();
         } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
     }
 
@@ -408,8 +584,10 @@ public class OfferService extends AccessibilityService {
         sb.append(number);
         sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), s, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int u = sb.length();
-        sb.append(unit);
-        sb.setSpan(new android.text.style.RelativeSizeSpan(0.5f), u, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (!unit.isEmpty()) {
+            sb.append(unit);
+            sb.setSpan(new android.text.style.RelativeSizeSpan(0.5f), u, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         TextView v = new TextView(this);
         v.setText(sb);
         v.setTextColor(Color.WHITE);
@@ -458,7 +636,7 @@ public class OfferService extends AccessibilityService {
     }
 
     /** Figurinha (GIF animado) acima do cartão. Se não conseguir animar, não mostra nada (o cartão continua normal). */
-    private void addSticker(LinearLayout parent, int resId, int wDp, int hDp) {
+    private void addSticker(LinearLayout parent, int resId, int wDp, int hDp, int overlapDp, int startDp) {
         try {
             android.graphics.drawable.Drawable d = android.graphics.ImageDecoder.decodeDrawable(
                     android.graphics.ImageDecoder.createSource(getResources(), resId));
@@ -471,7 +649,9 @@ public class OfferService extends AccessibilityService {
                 ad.start();
             }
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(wDp), dp(hDp));
-            p.bottomMargin = -dp(34); // a figura "pisa" no cartão
+            p.bottomMargin = -dp(overlapDp); // a figura "pisa" no card
+            p.leftMargin = dp(startDp);
+            p.gravity = Gravity.START;
             parent.addView(iv, p);
         } catch (Exception ex) {
             Log.e(TAG, "figurinha", ex);

@@ -12,10 +12,12 @@ public final class OfferParser {
     public static final class Offer {
         public final double value, pickupKm, tripKm, pickupMin, tripMin;
         public final boolean bundle;
+        public final String rating; // nota do passageiro, ex.: "4,95" (null se não achou)
         public final String pickupAddress; // endereço de embarque (pode ser null)
         public final String destination; // endereço da linha logo após o trecho da viagem (pode ser null)
 
-        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle, String destination, String pickupAddress) {
+        Offer(double value, double pickupKm, double pickupMin, double tripKm, double tripMin, boolean bundle, String destination, String pickupAddress, String rating) {
+            this.rating = rating;
             this.destination = destination;
             this.pickupAddress = pickupAddress;
             this.value = value; this.pickupKm = pickupKm; this.pickupMin = pickupMin;
@@ -63,7 +65,8 @@ public final class OfferParser {
         double[] trip = legs.get(legs.size() - 1);
         double[] pickup = legs.size() >= 2 ? legs.get(0) : new double[]{0, 0};
         return new Offer(value, pickup[1], pickup[0], trip[1], trip[0], bundle, tripEnd < 0 ? null : addressAfter(text, tripEnd),
-                nLegs >= 2 ? firstAddress(text.substring(firstEnd, lastStart)) : null);
+                nLegs >= 2 ? firstAddress(text.substring(firstEnd, lastStart)) : null,
+                findRating(text));
     }
 
     private static double km(String n, String unit) {
@@ -138,5 +141,14 @@ public final class OfferParser {
         if (ps.size() < 2 && i < 0) return null;
         if (last.isEmpty() || Character.isDigit(last.charAt(0)) || last.length() < 3) return null;
         return last;
+    }
+
+    // nota sozinha na linha ("4,95", "5,00 · 14 corridas", "4,91 (2595)")
+    private static final Pattern RATING = Pattern.compile(
+            "(?m)^\\s*([1-5][.,][0-9]{1,2})\\s*(?:\\([0-9.]+\\)|[·•.]\\s*[0-9.]+\\s*corridas|corridas.*)?\\s*$");
+
+    static String findRating(String text) {
+        Matcher m = RATING.matcher(text);
+        return m.find() ? m.group(1).replace('.', ',') : null;
     }
 }
