@@ -123,10 +123,10 @@ public class MainActivity extends Activity {
         Button save = button("Salvar metas", GREEN, Color.parseColor("#06260F"));
         save.setOnClickListener(v -> {
             try {
-                double b = Double.parseDouble(bad.getText().toString().replace(',', '.'));
-                double g = Double.parseDouble(good.getText().toString().replace(',', '.'));
-                if (b > g) { Toast.makeText(this, "O valor de \"ruim\" deve ser menor que o de \"boa\"", Toast.LENGTH_LONG).show(); return; }
-                s.save(b, g, Double.parseDouble(hr.getText().toString().replace(',', '.')));
+                double badV = Double.parseDouble(bad.getText().toString().replace(',', '.'));
+                double goodV = Double.parseDouble(good.getText().toString().replace(',', '.'));
+                if (badV > goodV) { Toast.makeText(this, "O valor de \"ruim\" deve ser menor que o de \"boa\"", Toast.LENGTH_LONG).show(); return; }
+                s.save(badV, goodV, Double.parseDouble(hr.getText().toString().replace(',', '.')));
                 Toast.makeText(this, "Metas salvas", Toast.LENGTH_SHORT).show();
             } catch (NumberFormatException e) {
                 Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
