@@ -1,7 +1,6 @@
 package br.local.corridacerta;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.GestureDescription;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.PixelFormat;
@@ -57,7 +56,6 @@ public class OfferService extends AccessibilityService {
                 + "\nApps que geraram eventos: " + pkgsSeen
                 + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
                 + "\nÚltimo card de corrida visto: " + lastOfferInfo
-                + "\nBotões clicáveis do card: " + clickInfo
                 + "\nOCR: " + ocrInfo
                 + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
@@ -122,7 +120,6 @@ public class OfferService extends AccessibilityService {
                 found = true;
                 lastTreeHit = System.currentTimeMillis();
                 rememberOffer(o, pkg.equals(UBER) ? "Uber" : "99", null);
-                clickInfo = pkg + " às " + now() + "\n" + clickables(root);
                 if (!text.equals(lastShownText)) {
                     lastShownText = text;
                     settings.setLastRaw(text);
@@ -243,16 +240,7 @@ public class OfferService extends AccessibilityService {
                     }
                     final Bitmap img = bmp;
                     recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(img, 0))
-                            .addOnSuccessListener(res -> {
-                                ocrBusy = false;
-                                java.util.List<Object[]> ls = new java.util.ArrayList<>();
-                                for (com.google.mlkit.vision.text.Text.TextBlock b : res.getTextBlocks())
-                                    for (com.google.mlkit.vision.text.Text.Line ln : b.getLines())
-                                        if (ln.getBoundingBox() != null) ls.add(new Object[]{ln.getText(), ln.getBoundingBox()});
-                                ocrLines = ls;
-                                onOcrText(res.getText(), img);
-                                img.recycle();
-                            })
+                            .addOnSuccessListener(res -> { ocrBusy = false; onOcrText(res.getText(), img); img.recycle(); })
                             .addOnFailureListener(ex -> { ocrBusy = false; img.recycle(); ocrInfo = "OCR falhou: " + ex; diag(""); });
                 }
                 @Override public void onFailure(int code) {
@@ -409,137 +397,6 @@ public class OfferService extends AccessibilityService {
             card.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(280)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
         } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
-        if (settings.buttons()) showButtons();
-    }
-
-    // ---- botões de atalho: aceitar (verde) e recusar (vermelho), no canto esquerdo ----
-    private LinearLayout btnWin;
-
-    private TextView roundButton(String symbol, int top, int bottom) {
-        TextView b = new TextView(this);
-        b.setText(symbol);
-        b.setTextColor(Color.WHITE);
-        b.setTextSize(34);
-        b.setTypeface(b.getTypeface(), Typeface.BOLD);
-        b.setGravity(Gravity.CENTER);
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bottom});
-        g.setShape(GradientDrawable.OVAL);
-        g.setStroke(dp(2), Color.argb(170, 255, 255, 255));
-        b.setBackground(g);
-        b.setElevation(dp(10));
-        return b;
-    }
-
-    private void showButtons() {
-        removeButtons();
-        btnWin = new LinearLayout(this);
-        btnWin.setOrientation(LinearLayout.VERTICAL);
-        btnWin.setClipChildren(false);
-        btnWin.setPadding(dp(6), dp(6), dp(14), dp(14));
-        TextView ok = roundButton("✓", Color.parseColor("#34D27B"), Color.parseColor("#0E8A4A"));
-        TextView no = roundButton("✕", Color.parseColor("#F87171"), Color.parseColor("#B91C1C"));
-        ok.setOnClickListener(v -> act(true));
-        no.setOnClickListener(v -> act(false));
-        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(dp(76), dp(76));
-        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(dp(76), dp(76));
-        b.topMargin = dp(22);
-        btnWin.addView(ok, a);
-        btnWin.addView(no, b);
-        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                PixelFormat.TRANSLUCENT);
-        lp.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        lp.x = 0;
-        lp.y = dp(60);
-        try { wm.addView(btnWin, lp); } catch (Exception ex) { Log.e(TAG, "botoes", ex); btnWin = null; }
-    }
-
-    private void removeButtons() {
-        if (btnWin != null) { try { wm.removeView(btnWin); } catch (Exception ignored) {} btnWin = null; }
-    }
-
-    private static final java.util.regex.Pattern ACCEPT_RE = java.util.regex.Pattern.compile(
-            "(?is)^\\s*(tenho interesse|aceitar.*|aceito|confirmar.*)\\s*$");
-    private static final java.util.regex.Pattern DECLINE_RE = java.util.regex.Pattern.compile(
-            "(?is)^\\s*(fechar|recusar.*|dispensar|rejeitar|ignorar|close|dismiss|negar)\\s*$");
-    private java.util.List<Object[]> ocrLines = new java.util.ArrayList<>();
-    private String clickInfo = "(nenhum botão listado ainda)";
-
-    /** Toca no botão de aceitar ou de recusar do card da Uber/99. */
-    private void act(boolean accept) {
-        java.util.regex.Pattern re = accept ? ACCEPT_RE : DECLINE_RE;
-        java.util.List<AccessibilityNodeInfo> roots = new java.util.ArrayList<>();
-        for (AccessibilityWindowInfo w : getWindows()) { AccessibilityNodeInfo r = w.getRoot(); if (r != null) roots.add(r); }
-        AccessibilityNodeInfo act = getRootInActiveWindow();
-        if (act != null) roots.add(act);
-        for (AccessibilityNodeInfo root : roots) {
-            String pkg = String.valueOf(root.getPackageName());
-            if (!pkg.equals(UBER) && !pkg.equals(APP99)) continue;
-            AccessibilityNodeInfo n = findNode(root, re, 0);
-            if (n != null && clickNode(n)) return;
-        }
-        if (accept) { // 99: o texto não vem pela acessibilidade; usa a posição lida no print
-            for (Object[] ln : ocrLines) {
-                if (re.matcher((String) ln[0]).matches()) {
-                    android.graphics.Rect r = (android.graphics.Rect) ln[1];
-                    if (tap(r.centerX(), r.centerY())) return;
-                }
-            }
-        }
-        android.widget.Toast.makeText(this, accept ? "Não achei o botão de aceitar. Use o da tela." : "Não achei o botão de recusar. Use o da tela.",
-                android.widget.Toast.LENGTH_SHORT).show();
-    }
-
-    private AccessibilityNodeInfo findNode(AccessibilityNodeInfo n, java.util.regex.Pattern re, int depth) {
-        if (n == null || depth > 60) return null;
-        CharSequence t = n.getText(), d = n.getContentDescription();
-        if ((t != null && re.matcher(t).matches()) || (d != null && re.matcher(d).matches())) return n;
-        for (int i = 0; i < n.getChildCount(); i++) {
-            AccessibilityNodeInfo r = findNode(n.getChild(i), re, depth + 1);
-            if (r != null) return r;
-        }
-        return null;
-    }
-
-    private boolean clickNode(AccessibilityNodeInfo node) {
-        AccessibilityNodeInfo c = node;
-        while (c != null && !c.isClickable()) c = c.getParent();
-        if (c != null && c.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true;
-        android.graphics.Rect r = new android.graphics.Rect();
-        node.getBoundsInScreen(r);
-        return tap(r.centerX(), r.centerY());
-    }
-
-    private boolean tap(float x, float y) {
-        android.graphics.Path p = new android.graphics.Path();
-        p.moveTo(x, y);
-        GestureDescription g = new GestureDescription.Builder()
-                .addStroke(new GestureDescription.StrokeDescription(p, 0, 60)).build();
-        return dispatchGesture(g, null, null);
-    }
-
-    /** Lista os elementos clicáveis do card (para eu ajustar os botões se algum não for achado). */
-    private String clickables(AccessibilityNodeInfo n) {
-        StringBuilder sb = new StringBuilder();
-        collectClickables(n, sb, 0, new int[]{0});
-        return sb.length() == 0 ? "(nenhum elemento clicável)" : sb.toString();
-    }
-
-    private void collectClickables(AccessibilityNodeInfo n, StringBuilder sb, int depth, int[] count) {
-        if (n == null || depth > 60 || count[0] >= 14) return;
-        if (n.isClickable()) {
-            android.graphics.Rect r = new android.graphics.Rect();
-            n.getBoundsInScreen(r);
-            sb.append("• ").append(n.getText() == null ? "" : n.getText()).append(" | ")
-              .append(n.getContentDescription() == null ? "" : n.getContentDescription()).append(" | ")
-              .append(n.getViewIdResourceName() == null ? "" : n.getViewIdResourceName()).append(" | ")
-              .append(r.left).append(',').append(r.top).append('-').append(r.right).append(',').append(r.bottom).append('\n');
-            count[0]++;
-        }
-        for (int i = 0; i < n.getChildCount(); i++) collectClickables(n.getChild(i), sb, depth + 1, count);
     }
 
     /** "R$ 3,35/km": número grande, "R$" e unidade menores. */
@@ -633,7 +490,6 @@ public class OfferService extends AccessibilityService {
 
     private void removeCard() {
         handler.removeCallbacks(hide);
-        removeButtons();
         if (card != null) { try { wm.removeView(card); } catch (Exception ignored) {} card = null; }
     }
 

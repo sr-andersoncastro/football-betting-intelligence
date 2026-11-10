@@ -33,7 +33,4 @@ final class Settings {
     String acceptedDest() { return p.getString("accDest", ""); }
     long acceptedAt() { return p.getLong("accAt", 0); }
     void clearTrips() { p.edit().remove("offDest").remove("offAt").remove("accDest").remove("accAt").remove("lastRaw").remove("lastResult").remove("diag").apply(); }
-    /** Botões de atalho (aceitar / recusar) no canto esquerdo durante uma oferta. */
-    boolean buttons() { return p.getBoolean("buttons", true); }
-    void setButtons(boolean v) { p.edit().putBoolean("buttons", v).apply(); }
 }
