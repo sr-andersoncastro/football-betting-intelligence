@@ -317,6 +317,8 @@ public class OfferService extends AccessibilityService {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         if (cat == 2) addSticker(card, R.raw.sticker_boa, 190, 105);
+        else if (cat == 0) addSticker(card, R.raw.sticker_ruim, 190, 107);
+        // cat == 1 (média): ainda sem figurinha
         card.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
