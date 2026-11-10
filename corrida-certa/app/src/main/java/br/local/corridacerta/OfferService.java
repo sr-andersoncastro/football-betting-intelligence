@@ -56,6 +56,7 @@ public class OfferService extends AccessibilityService {
                 + "\nApps que geraram eventos: " + pkgsSeen
                 + "\nLeituras feitas: " + scans + "\nJanelas vistas: " + lastWindows
                 + "\nÚltimo card de corrida visto: " + lastOfferInfo
+                + "\nCard: " + cardInfo + (cardError.isEmpty() ? "" : "\nERRO ao desenhar o card: " + cardError)
                 + "\nOCR: " + ocrInfo
                 + "\nUber/99: " + lastUberInfo + "\n" + extra);
     }
@@ -98,7 +99,7 @@ public class OfferService extends AccessibilityService {
         wl.append(']');
         lastWindows = wl.toString();
         AccessibilityNodeInfo active = getRootInActiveWindow();
-        if (active != null) roots.add(active); // alternativa caso getWindows() não traga a janela
+        if (active != null && !roots.contains(active)) roots.add(active); // alternativa caso getWindows() não traga a janela
         for (AccessibilityNodeInfo root : roots) {
             String pkg = String.valueOf(root.getPackageName());
             if (!pkg.equals(UBER) && !pkg.equals(APP99)) continue;
@@ -120,12 +121,13 @@ public class OfferService extends AccessibilityService {
                 found = true;
                 lastTreeHit = System.currentTimeMillis();
                 rememberOffer(o, pkg.equals(UBER) ? "Uber" : "99", null);
-                if (!text.equals(lastShownText)) {
-                    lastShownText = text;
+                String key = offerKey(o);
+                if (!key.equals(lastShownText)) {
+                    lastShownText = key;
                     settings.setLastRaw(text);
                     settings.setLastResult(String.format(Locale.US, "%s: R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
                             pkg.equals(UBER) ? "Uber" : "99", o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
-                    showCard(o, geometryFromTree(root), pkg.equals(UBER) ? "Uber" : "99");
+                    showCardSafe(o, geometryFromTree(root), pkg.equals(UBER) ? "Uber" : "99", "árvore");
                 }
                 handler.removeCallbacks(hide);
                 handler.postDelayed(hide, 20000);
@@ -222,9 +224,26 @@ public class OfferService extends AccessibilityService {
             recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
                     com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
         }
+        if (overlayInShots && card != null) { // esconde o nosso card só durante a captura
+            setOverlaysAlpha(0f);
+            handler.postDelayed(this::captureNow, 90);
+        } else {
+            captureNow();
+        }
+    }
+
+    private boolean overlayInShots;
+
+    private void setOverlaysAlpha(float a) {
+        if (card != null) card.setAlpha(a);
+        if (declineWin != null) declineWin.setAlpha(a);
+    }
+
+    private void captureNow() {
         try {
             takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
                 @Override public void onSuccess(ScreenshotResult r) {
+                    setOverlaysAlpha(1f);
                     Bitmap bmp = null;
                     try {
                         HardwareBuffer hb = r.getHardwareBuffer();
@@ -253,12 +272,14 @@ public class OfferService extends AccessibilityService {
                             .addOnFailureListener(ex -> { ocrBusy = false; img.recycle(); ocrInfo = "OCR falhou: " + ex; diag(""); });
                 }
                 @Override public void onFailure(int code) {
+                    setOverlaysAlpha(1f);
                     ocrBusy = false;
                     ocrInfo = "print falhou, código " + code + " (" + now() + ")";
                     diag("");
                 }
             });
         } catch (Exception ex) {
+            setOverlaysAlpha(1f);
             ocrBusy = false;
             ocrInfo = "takeScreenshot erro: " + ex;
             diag("");
@@ -268,20 +289,36 @@ public class OfferService extends AccessibilityService {
     private void onOcrText(String text, Bitmap shot) {
         ocrInfo = now() + ", " + text.length() + " caracteres:\n" + (text.length() > 500 ? text.substring(0, 500) : text);
         if (looksLikeOffer(text)) lastOfferInfo = "OCR " + ocrInfo;
+        // se o print mostra o NOSSO card, ele cobre o real: passa a esconder o card durante a captura
+        if (card != null && !overlayInShots && text.matches("(?s).*CORRIDA (BOA|M[ÉE]DIA|RUIM).*")) {
+            overlayInShots = true;
+            lastOcr = 0;
+            handler.removeCallbacks(hide);
+            handler.postDelayed(hide, 20000);
+            diag("O card aparece no print: será escondido durante a captura.");
+            return;
+        }
+        // qual app é? "Tenho interesse" = Uber; "Tentando encontrar" = 99 (a Uber pode estar numa bolinha com a 99 aberta)
+        String plat = ocrPkg.equals(UBER) ? "Uber" : "99";
+        for (Object[] ln : ocrLines) {
+            String s = (String) ln[0];
+            if (s.matches("(?is)^\\s*tenho interesse\\s*$")) plat = "Uber";
+            else if (s.matches("(?is)^\\s*tentando encontrar.*$")) plat = "99";
+        }
         OfferParser.Offer o = OfferParser.parse(text);
         // o botão de aceitar do card real aparece pelo "buraco" do nosso card: se ele está na tela, a oferta continua viva
         boolean alive = false;
         for (Object[] ln : ocrLines) if (ACCEPT_RE.matcher((String) ln[0]).matches()) { alive = true; break; }
         if (o != null) {
-            String key = String.format(Locale.US, "%.2f|%.1f|%.1f", o.value, o.pickupKm, o.tripKm);
+            String key = offerKey(o);
             if (!key.equals(lastShownText)) {
                 lastShownText = key;
                 settings.setLastRaw(text);
-                settings.setLastResult(String.format(Locale.US, "Uber/99 (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
-                        o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
-                showCard(o, geometryFromOcr(), ocrPkg.equals(UBER) ? "Uber" : "99");
+                settings.setLastResult(String.format(Locale.US, "%s (OCR): R$ %.2f | %.2f/km | %.2f/h (%.1f km, %.0f min)",
+                        plat, o.value, o.perKm(), o.perHour(), o.totalKm(), o.totalMin()));
+                showCardSafe(o, geometryFromOcr(), plat, "print");
             }
-            rememberOffer(o, ocrPkg.equals(UBER) ? "Uber" : "99", shot);
+            rememberOffer(o, plat, shot);
             handler.removeCallbacks(hide);
             handler.postDelayed(hide, 20000);
         } else if (alive && !lastShownText.isEmpty()) {
@@ -326,7 +363,7 @@ public class OfferService extends AccessibilityService {
     private AccessibilityNodeInfo findNode(AccessibilityNodeInfo n, java.util.regex.Pattern re, int depth) {
         if (n == null || depth > 60) return null;
         CharSequence tx = n.getText(), d = n.getContentDescription();
-        if ((tx != null && re.matcher(tx).matches()) || (d != null && re.matcher(d).matches())) return n;
+        if (((tx != null && re.matcher(tx).matches()) || (d != null && re.matcher(d).matches())) && n.isVisibleToUser()) return n;
         for (int i = 0; i < n.getChildCount(); i++) {
             AccessibilityNodeInfo r = findNode(n.getChild(i), re, depth + 1);
             if (r != null) return r;
@@ -342,6 +379,44 @@ public class OfferService extends AccessibilityService {
             if (android.graphics.Rect.intersects(r, within)) out.add(r);
         }
         for (int i = 0; i < n.getChildCount(); i++) collectClickRects(n.getChild(i), within, out, depth + 1);
+    }
+
+    /** O retângulo do card precisa ser plausível (dentro da tela, largo, nem baixo nem alto demais). */
+    private boolean sane(android.graphics.Rect r) {
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        return r.width() >= dm.widthPixels * 0.6f && r.width() <= dm.widthPixels * 1.05f
+                && r.height() >= dp(120) && r.height() <= dm.heightPixels * 0.8f
+                && r.left >= -dp(10) && r.right <= dm.widthPixels + dp(10) && r.top >= 0 && r.bottom <= dm.heightPixels + dp(40);
+    }
+
+    /** Uber: o X de recusar fica dentro do card, no canto de cima à direita (proporções medidas num card real). */
+    private android.graphics.Rect uberCloseFallback(android.graphics.Rect card) {
+        float w = card.width();
+        int size = Math.round(0.0925f * w);
+        int right = Math.round(card.right - 0.0297f * w);
+        int top = Math.round(card.top + 0.0285f * w);
+        return new android.graphics.Rect(right - size, top, right, top + size);
+    }
+
+    private static String offerKey(OfferParser.Offer o) {
+        return String.format(Locale.US, "%.2f|%.1f|%.1f", o.value, o.pickupKm, o.tripKm);
+    }
+
+    private String cardInfo = "(nenhum card desenhado ainda)";
+    private String cardError = "";
+
+    /** Desenha o card; se algo falhar, registra o erro no Diagnóstico e tenta o card simples no alto da tela. */
+    private void showCardSafe(OfferParser.Offer o, CardGeometry geo, String platform, String source) {
+        try {
+            showCard(o, geo, platform);
+            cardInfo = platform + " (" + source + ") " + (geo == null ? "posição padrão" : "rect=" + geo.rect.toShortString()
+                    + " aceitar=" + (geo.accept == null ? "-" : geo.accept.toShortString())
+                    + " x=" + (geo.close == null ? "-" : geo.close.toShortString())) + " às " + now();
+        } catch (Throwable ex) {
+            cardError = ex + " às " + now();
+            Log.e(TAG, "showCard", ex);
+            try { showCard(o, null, platform); } catch (Throwable ex2) { Log.e(TAG, "showCard2", ex2); }
+        }
     }
 
     /** Uber: acha o card pelo botão "Tenho interesse" e pelo preço (a acessibilidade informa as posições). */
@@ -368,6 +443,7 @@ public class OfferService extends AccessibilityService {
                 p = p.getParent();
             }
             if (card == null) card = new android.graphics.Rect(ar.left - dp(10), pr.top - dp(48), ar.right + dp(10), ar.bottom + dp(14));
+            if (!sane(card)) return null;
             CardGeometry g = new CardGeometry();
             g.rect = card;
             g.accept = ar;
@@ -400,6 +476,7 @@ public class OfferService extends AccessibilityService {
             int side = Math.round(sw * 0.018f);
             CardGeometry g = new CardGeometry();
             g.rect = new android.graphics.Rect(side, minTop - dp(18), sw - side, ar.centerY() + dp(22) + dp(13));
+            if (!sane(g.rect)) return null;
             g.accept = new android.graphics.Rect(g.rect.left + dp(10), ar.centerY() - dp(22), g.rect.right - dp(10), ar.centerY() + dp(22));
             return g;
         } catch (Exception ex) { Log.e(TAG, "geometria", ex); return null; }
@@ -539,7 +616,7 @@ public class OfferService extends AccessibilityService {
         // retângulo do card real (ou, se não achou, um card padrão no alto da tela, sem buracos)
         android.graphics.Rect rect;
         android.graphics.Rect accept = null, close = null;
-        if (geo != null && geo.rect != null) { rect = new android.graphics.Rect(geo.rect); accept = geo.accept; close = geo.close; }
+        if (geo != null && geo.rect != null) { rect = new android.graphics.Rect(geo.rect); accept = geo.accept; close = geo.close; if (close == null && platform.equals("Uber")) close = uberCloseFallback(rect); }
         else { int w = Math.min(sw - dp(24), dp(360)); int l = (sw - w) / 2; rect = new android.graphics.Rect(l, dp(110), l + w, dp(110) + dp(250)); }
         int W = rect.width();
 
