@@ -405,23 +405,88 @@ public class OfferService extends AccessibilityService {
         } catch (Exception ex) { Log.e(TAG, "geometria", ex); return null; }
     }
 
-    /** Fundo do card: degradê, brilho, borda e furos transparentes nos botões originais. */
+    /** Botão nosso desenhado exatamente sobre um botão original (do mesmo tamanho; o toque passa para o original). */
+    private static final class DecoBtn {
+        final android.graphics.RectF r; final boolean accept;
+        DecoBtn(android.graphics.RectF r, boolean accept) { this.r = r; this.accept = accept; }
+    }
+
+    /** Desenha o botão ACEITAR (verde, pulsando) ou o ✕ de recusar (vermelho). */
+    private void drawDecoBtn(android.graphics.Canvas c, android.graphics.Paint p, DecoBtn b, float pulse) {
+        android.graphics.RectF r = b.r;
+        float rad = Math.min(dp(16), Math.min(r.width(), r.height()) / 2f);
+        int c1 = b.accept ? Color.parseColor("#4ADE80") : Color.parseColor("#F87171");
+        int c2 = b.accept ? Color.parseColor("#15803D") : Color.parseColor("#B91C1C");
+        if (b.accept) { // brilho que pulsa em volta do botão
+            p.setShader(null);
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(dp(6));
+            p.setColor(Color.argb((int) (60 + 140 * pulse), 255, 255, 255));
+            c.drawRoundRect(r.left - dp(3), r.top - dp(3), r.right + dp(3), r.bottom + dp(3), rad + dp(3), rad + dp(3), p);
+        }
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        p.setShader(new android.graphics.LinearGradient(0, r.top, 0, r.bottom, c1, c2, android.graphics.Shader.TileMode.CLAMP));
+        c.drawRoundRect(r, rad, rad, p);
+        p.setShader(new android.graphics.LinearGradient(0, r.top, 0, r.top + r.height() * 0.5f, Color.argb(110, 255, 255, 255), Color.argb(0, 255, 255, 255), android.graphics.Shader.TileMode.CLAMP));
+        c.drawRoundRect(r.left + dp(2), r.top + dp(2), r.right - dp(2), r.top + r.height() * 0.5f, rad, rad, p);
+        p.setShader(null);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(dp(3));
+        p.setColor(Color.WHITE);
+        c.drawRoundRect(r, rad, rad, p);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        if (b.accept) {
+            p.setColor(Color.WHITE);
+            p.setTextAlign(android.graphics.Paint.Align.CENTER);
+            p.setFakeBoldText(true);
+            p.setTextSize(Math.min(dp(22), r.height() * 0.48f));
+            p.setShadowLayer(dp(2), 0, dp(1), Color.argb(130, 0, 0, 0));
+            c.drawText("✓ ACEITAR", r.centerX(), r.centerY() + p.getTextSize() * 0.35f, p);
+            p.clearShadowLayer();
+            p.setFakeBoldText(false);
+        } else {
+            float s = Math.min(r.width(), r.height()) * 0.24f;
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            p.setStrokeWidth(Math.max(dp(3), Math.min(r.width(), r.height()) * 0.11f));
+            p.setColor(Color.WHITE);
+            c.drawLine(r.centerX() - s, r.centerY() - s, r.centerX() + s, r.centerY() + s, p);
+            c.drawLine(r.centerX() + s, r.centerY() - s, r.centerX() - s, r.centerY() + s, p);
+            p.setStrokeCap(android.graphics.Paint.Cap.BUTT);
+            p.setStyle(android.graphics.Paint.Style.FILL);
+        }
+    }
+
+    /** Fundo do card: degradê, brilho, borda e os botões desenhados por cima dos originais. */
     private class CardBg extends View {
         private final int top, bottom;
-        private final java.util.List<android.graphics.RectF> holes;
+        private final java.util.List<DecoBtn> btns;
         private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Paint clear = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private float pulse;
+        private android.animation.ValueAnimator anim;
 
-        CardBg(android.content.Context c, int top, int bottom, java.util.List<android.graphics.RectF> holes) {
+        CardBg(android.content.Context c, int top, int bottom, java.util.List<DecoBtn> btns) {
             super(c);
-            this.top = top; this.bottom = bottom; this.holes = holes;
-            clear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
-            setLayerType(LAYER_TYPE_HARDWARE, null);
+            this.top = top; this.bottom = bottom; this.btns = btns;
+        }
+
+        @Override protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            anim.setDuration(750);
+            anim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            anim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            anim.addUpdateListener(a -> { pulse = (float) a.getAnimatedValue(); invalidate(); });
+            anim.start();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            if (anim != null) anim.cancel();
+            super.onDetachedFromWindow();
         }
 
         @Override protected void onDraw(android.graphics.Canvas c) {
             float w = getWidth(), h = getHeight(), r = dp(22);
-            int sc = c.saveLayer(0, 0, w, h, null);
             p.setStyle(android.graphics.Paint.Style.FILL);
             p.setShader(new android.graphics.LinearGradient(0, 0, 0, h, top, bottom, android.graphics.Shader.TileMode.CLAMP));
             c.drawRoundRect(0, 0, w, h, r, r, p);
@@ -432,10 +497,7 @@ public class OfferService extends AccessibilityService {
             p.setStrokeWidth(dp(2));
             p.setColor(Color.argb(150, 255, 255, 255));
             c.drawRoundRect(dp(1), dp(1), w - dp(1), h - dp(1), r, r, p);
-            for (android.graphics.RectF hole : holes) c.drawRoundRect(hole, dp(14), dp(14), clear);
-            p.setColor(Color.argb(190, 255, 255, 255));
-            for (android.graphics.RectF hole : holes) c.drawRoundRect(hole, dp(14), dp(14), p);
-            c.restoreToCount(sc);
+            for (DecoBtn b : btns) drawDecoBtn(c, p, b, pulse);
         }
     }
 
@@ -494,7 +556,7 @@ public class OfferService extends AccessibilityService {
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(0, 0, topRightReserve, 0);
-        TextView pill = txt((cat == 2 ? "BOA" : (cat == 0 ? "RUIM" : "MÉDIA")) + " · " + platform.toUpperCase(Locale.ROOT), 12, Color.WHITE, true);
+        TextView pill = txt("CORRIDA " + (cat == 2 ? "BOA" : (cat == 0 ? "RUIM" : "MÉDIA")) + " · " + platform.toUpperCase(Locale.ROOT), 12, Color.WHITE, true);
         pill.setLetterSpacing(0.08f);
         pill.setPadding(dp(10), dp(3), dp(10), dp(3));
         GradientDrawable pbg = new GradientDrawable();
@@ -540,12 +602,13 @@ public class OfferService extends AccessibilityService {
         int H = Math.max(rect.height(), content.getMeasuredHeight());
         int cardTop = rect.bottom - H;
 
-        java.util.List<android.graphics.RectF> holes = new java.util.ArrayList<>();
-        if (accept != null) holes.add(new android.graphics.RectF(accept.left - rect.left - dp(2), accept.top - cardTop - dp(2), accept.right - rect.left + dp(2), accept.bottom - cardTop + dp(2)));
-        if (close != null) holes.add(new android.graphics.RectF(close.left - rect.left - dp(2), close.top - cardTop - dp(2), close.right - rect.left + dp(2), close.bottom - cardTop + dp(2)));
+        // botões nossos, do mesmo tamanho dos originais, desenhados por cima deles (o toque passa para o original)
+        java.util.List<DecoBtn> btns = new java.util.ArrayList<>();
+        if (accept != null) btns.add(new DecoBtn(new android.graphics.RectF(accept.left - rect.left, accept.top - cardTop, accept.right - rect.left, accept.bottom - cardTop), true));
+        if (close != null) btns.add(new DecoBtn(new android.graphics.RectF(close.left - rect.left, close.top - cardTop, close.right - rect.left, close.bottom - cardTop), false));
 
         android.widget.FrameLayout box = new android.widget.FrameLayout(this);
-        box.addView(new CardBg(this, top, bottom, holes), new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        box.addView(new CardBg(this, top, bottom, btns), new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         box.addView(content, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         // composição: figurinha pequena "espiando" acima do canto do card
@@ -553,8 +616,8 @@ public class OfferService extends AccessibilityService {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setClipChildren(false);
         card.setClipToPadding(false);
-        int stickerH = dp(84), overlap = dp(22);
-        addSticker(card, cat == 2 ? R.raw.sticker_boa : (cat == 0 ? R.raw.sticker_ruim : R.raw.sticker_media), 150, 84, 22, 14);
+        int stickerH = dp(140), overlap = dp(34);
+        addSticker(card, cat == 2 ? R.raw.sticker_boa : (cat == 0 ? R.raw.sticker_ruim : R.raw.sticker_media), 250, 140, 34, -1);
         card.addView(box, new LinearLayout.LayoutParams(W, H));
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
@@ -573,6 +636,34 @@ public class OfferService extends AccessibilityService {
             card.setAlpha(0f);
             card.animate().alpha(1f).setDuration(160).start();
         } catch (Exception ex) { Log.e(TAG, "overlay", ex); card = null; }
+        if (close == null && platform.equals("99") && geo != null) showDecline99();
+    }
+
+    private View declineWin;
+
+    /** 99: o X de recusar fica no canto da tela (fora do card). Posição aproximada, medida nos prints da 99; mesmo tamanho do original. */
+    private void showDecline99() {
+        removeDecline99();
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        int d = Math.round(dm.widthPixels * 0.088f);
+        final DecoBtn b = new DecoBtn(new android.graphics.RectF(0, 0, d, d), false);
+        final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        declineWin = new View(this) {
+            @Override protected void onDraw(android.graphics.Canvas c) { drawDecoBtn(c, paint, b, 0f); }
+        };
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(d, d,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.x = Math.round(dm.widthPixels * 0.938f) - d / 2;
+        lp.y = Math.round(dm.heightPixels * 0.060f) - d / 2;
+        try { wm.addView(declineWin, lp); } catch (Exception ex) { Log.e(TAG, "x99", ex); declineWin = null; }
+    }
+
+    private void removeDecline99() {
+        if (declineWin != null) { try { wm.removeView(declineWin); } catch (Exception ignored) {} declineWin = null; }
     }
 
     /** "R$ 3,35/km": número grande, "R$" e unidade menores. */
@@ -650,8 +741,8 @@ public class OfferService extends AccessibilityService {
             }
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(wDp), dp(hDp));
             p.bottomMargin = -dp(overlapDp); // a figura "pisa" no card
-            p.leftMargin = dp(startDp);
-            p.gravity = Gravity.START;
+            if (startDp >= 0) p.leftMargin = dp(startDp);
+            p.gravity = startDp >= 0 ? Gravity.START : Gravity.CENTER_HORIZONTAL;
             parent.addView(iv, p);
         } catch (Exception ex) {
             Log.e(TAG, "figurinha", ex);
@@ -670,6 +761,7 @@ public class OfferService extends AccessibilityService {
 
     private void removeCard() {
         handler.removeCallbacks(hide);
+        removeDecline99();
         if (card != null) { try { wm.removeView(card); } catch (Exception ignored) {} card = null; }
     }
 
