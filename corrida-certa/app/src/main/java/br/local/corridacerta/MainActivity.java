@@ -99,6 +99,14 @@ public class MainActivity extends Activity {
         sw.setTrackTintList(ColorStateList.valueOf(Color.parseColor("#3B4856")));
         sw.setOnCheckedChangeListener((v, on) -> s.setEnabled(on));
         goals.addView(sw, lp(14));
+        Switch sb = new Switch(this);
+        sb.setText("Botões de atalho: aceitar / recusar");
+        sb.setTextColor(TEXT);
+        sb.setChecked(s.buttons());
+        sb.setThumbTintList(ColorStateList.valueOf(GREEN));
+        sb.setTrackTintList(ColorStateList.valueOf(Color.parseColor("#3B4856")));
+        sb.setOnCheckedChangeListener((v, on) -> s.setButtons(on));
+        goals.addView(sb, lp(10));
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
